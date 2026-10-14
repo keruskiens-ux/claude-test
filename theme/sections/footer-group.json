@@ -47,9 +47,17 @@
         "brand",
         "shop"
       ]
+    },
+    "df_float": {
+      "type": "df-floating-contact",
+      "settings": {
+        "whatsapp": "",
+        "email": "solodrivenate@gmail.com"
+      }
     }
   },
   "order": [
-    "footer"
+    "footer",
+    "df_float"
   ]
 }

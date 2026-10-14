@@ -25,9 +25,13 @@ Deleting them in Edit code is optional tidying.
 
 What changed:
 
-- **Homepage** (`templates/index.json`): announcement bar → header → hero → 4-stat trust strip → category grid
-  (the 5 smart collections, 3:4 tiles) → featured clubs → brand-story band → 3-step delivery timeline → footer.
-  The car-interior video hero, "Upgrade Your Ride" copy, and the **"30-Day Returns"** trust badge are gone.
+- **Homepage** (`templates/index.json`): announcement bar → centred logo with the full category menu → category
+  photo tiles (`sections/df-category-grid.liquid`: Shop All, Irons, Drivers, Fairway & Hybrids, Wedges & Putters,
+  Bags & Accessories) → trust strip → featured clubs → brand story → delivery timeline → footer. The text hero is
+  kept but hidden until there's a hero photo. Tiles use each collection's image; until there are photos they show
+  a plain pine panel with the label.
+- **Floating contact buttons** (`sections/df-floating-contact.liquid`, in the footer group): email now; a WhatsApp
+  button appears once a number is entered in the theme editor.
 - **Look** (`config/settings_data.json`): pine `#102A1C` / bone `#EDE8DC` / brass `#C2A05C`; Bodoni Moda headings,
   Inter body. The existing Drive Fresh logo and favicon are kept.
   Brass text on light backgrounds uses a darker brass (`#6B5222`) — real brass on bone is 2:1 contrast and unreadable.

@@ -9,6 +9,69 @@
  */
 {
   "sections": {
+    "df_tiles": {
+      "type": "df-category-grid",
+      "blocks": {
+        "tile_all": {
+          "type": "tile",
+          "settings": {
+            "label": "Shop All Clubs",
+            "link": "shopify://collections/all"
+          }
+        },
+        "tile_irons": {
+          "type": "tile",
+          "settings": {
+            "label": "Irons",
+            "collection": "golf-irons"
+          }
+        },
+        "tile_drivers": {
+          "type": "tile",
+          "settings": {
+            "label": "Drivers",
+            "collection": "drivers-woods"
+          }
+        },
+        "tile_fairway": {
+          "type": "tile",
+          "settings": {
+            "label": "Fairway & Hybrids",
+            "collection": "fairway-woods-hybrids"
+          }
+        },
+        "tile_wedges": {
+          "type": "tile",
+          "settings": {
+            "label": "Wedges & Putters",
+            "collection": "putters-wedges"
+          }
+        },
+        "tile_bags": {
+          "type": "tile",
+          "settings": {
+            "label": "Bags & Accessories",
+            "collection": "bags-accessories"
+          }
+        }
+      },
+      "block_order": [
+        "tile_all",
+        "tile_irons",
+        "tile_drivers",
+        "tile_fairway",
+        "tile_wedges",
+        "tile_bags"
+      ],
+      "settings": {
+        "heading": "",
+        "heading_size": "h1",
+        "columns_desktop": 3,
+        "color_scheme": "scheme-3",
+        "padding_top": 32,
+        "padding_bottom": 48
+      }
+    },
     "df_hero": {
       "type": "df-hero",
       "settings": {
@@ -23,7 +86,8 @@
         "color_scheme": "scheme-1",
         "padding_top": 64,
         "padding_bottom": 64
-      }
+      },
+      "disabled": true
     },
     "df_trust": {
       "type": "df-trust-strip",
@@ -64,63 +128,9 @@
         "stat_4"
       ],
       "settings": {
-        "color_scheme": "scheme-3",
+        "color_scheme": "scheme-2",
         "padding_top": 40,
         "padding_bottom": 40
-      }
-    },
-    "df_categories": {
-      "type": "collection-list",
-      "blocks": {
-        "col_1": {
-          "type": "featured_collection",
-          "settings": {
-            "collection": "golf-irons"
-          }
-        },
-        "col_2": {
-          "type": "featured_collection",
-          "settings": {
-            "collection": "drivers-woods"
-          }
-        },
-        "col_3": {
-          "type": "featured_collection",
-          "settings": {
-            "collection": "fairway-woods-hybrids"
-          }
-        },
-        "col_4": {
-          "type": "featured_collection",
-          "settings": {
-            "collection": "putters-wedges"
-          }
-        },
-        "col_5": {
-          "type": "featured_collection",
-          "settings": {
-            "collection": "bags-accessories"
-          }
-        }
-      },
-      "block_order": [
-        "col_1",
-        "col_2",
-        "col_3",
-        "col_4",
-        "col_5"
-      ],
-      "settings": {
-        "title": "Shop by category",
-        "heading_size": "h1",
-        "image_ratio": "portrait",
-        "columns_desktop": 5,
-        "color_scheme": "scheme-1",
-        "show_view_all": false,
-        "columns_mobile": "2",
-        "swipe_on_mobile": true,
-        "padding_top": 72,
-        "padding_bottom": 36
       }
     },
     "featured_collection": {
@@ -208,11 +218,11 @@
     }
   },
   "order": [
-    "df_hero",
+    "df_tiles",
     "df_trust",
-    "df_categories",
     "featured_collection",
     "df_story",
-    "df_timeline"
+    "df_timeline",
+    "df_hero"
   ]
 }

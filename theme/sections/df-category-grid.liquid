@@ -1,0 +1,191 @@
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+
+{%- style -%}
+  .section-{{ section.id }}-padding {
+    padding-top: {{ section.settings.padding_top | times: 0.75 | round: 0 }}px;
+    padding-bottom: {{ section.settings.padding_bottom | times: 0.75 | round: 0 }}px;
+  }
+
+  @media screen and (min-width: 750px) {
+    .section-{{ section.id }}-padding {
+      padding-top: {{ section.settings.padding_top }}px;
+      padding-bottom: {{ section.settings.padding_bottom }}px;
+    }
+
+    #DfTiles-{{ section.id }} {
+      grid-template-columns: repeat({{ section.settings.columns_desktop }}, minmax(0, 1fr));
+    }
+  }
+{%- endstyle -%}
+
+{% comment %}
+  Image tiles linking to collections. Image priority: the block's own image,
+  then the collection image, then the first product's image, then a pine panel.
+  Use only unbranded photography.
+{% endcomment %}
+<div class="color-{{ section.settings.color_scheme }} gradient">
+  <div class="page-width section-{{ section.id }}-padding">
+    {%- if section.settings.heading != blank -%}
+      <h2 class="df-tiles__heading {{ section.settings.heading_size }}">{{ section.settings.heading }}</h2>
+    {%- endif -%}
+    <ul class="df-tiles" id="DfTiles-{{ section.id }}" role="list">
+      {%- for block in section.blocks -%}
+        {%- liquid
+          assign tile_collection = block.settings.collection
+          assign tile_image = block.settings.image
+          if tile_image == blank and tile_collection != blank
+            assign tile_image = tile_collection.featured_image
+          endif
+          if tile_image == blank and tile_collection != blank
+            assign tile_image = tile_collection.products.first.featured_media.preview_image
+          endif
+          assign tile_label = block.settings.label
+          if tile_label == blank and tile_collection != blank
+            assign tile_label = tile_collection.title
+          endif
+          assign tile_url = block.settings.link
+          if tile_url == blank and tile_collection != blank
+            assign tile_url = tile_collection.url
+          endif
+          if tile_url == blank
+            assign tile_url = routes.all_products_collection_url
+          endif
+        -%}
+        <li class="df-tiles__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}" {{ block.shopify_attributes }}{% if settings.animations_reveal_on_scroll %} data-cascade style="--animation-order: {{ forloop.index }};"{% endif %}>
+          <a href="{{ tile_url }}" class="df-tile{% if tile_image == blank %} df-tile--empty{% endif %}">
+            {%- if tile_image != blank -%}
+              {{
+                tile_image
+                | image_url: width: 1200
+                | image_tag:
+                  loading: 'lazy',
+                  class: 'df-tile__img',
+                  sizes: '(min-width: 990px) 33vw, 50vw',
+                  widths: '300, 450, 600, 900, 1200',
+                  alt: tile_label
+              }}
+            {%- endif -%}
+            <span class="df-tile__label">
+              {{- tile_label | escape -}}
+              <span class="df-tile__arrow" aria-hidden="true">→</span>
+            </span>
+          </a>
+        </li>
+      {%- endfor -%}
+    </ul>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "DF Category tiles",
+  "tag": "section",
+  "class": "section",
+  "max_blocks": 12,
+  "disabled_on": {
+    "groups": ["header", "footer"]
+  },
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Tiles are 3:4 portrait (900 × 1200 px). Unbranded photography only — no brand names or logos."
+    },
+    {
+      "type": "inline_richtext",
+      "id": "heading",
+      "label": "Heading"
+    },
+    {
+      "type": "select",
+      "id": "heading_size",
+      "label": "Heading size",
+      "options": [
+        { "value": "h2", "label": "Small" },
+        { "value": "h1", "label": "Medium" },
+        { "value": "h0", "label": "Large" }
+      ],
+      "default": "h1"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "min": 2,
+      "max": 4,
+      "step": 1,
+      "label": "Columns on desktop",
+      "default": 3
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:sections.all.colors.label",
+      "default": "scheme-3"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.all.padding.section_padding_heading"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "label": "t:sections.all.padding.padding_top",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "label": "t:sections.all.padding.padding_bottom",
+      "default": 40
+    }
+  ],
+  "blocks": [
+    {
+      "type": "tile",
+      "name": "Tile",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Collection"
+        },
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image",
+          "info": "Optional. Defaults to the collection's image."
+        },
+        {
+          "type": "text",
+          "id": "label",
+          "label": "Label",
+          "info": "Optional. Defaults to the collection's title."
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Link",
+          "info": "Optional. Defaults to the collection."
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "DF Category tiles",
+      "blocks": [
+        { "type": "tile" },
+        { "type": "tile" },
+        { "type": "tile" }
+      ]
+    }
+  ]
+}
+{% endschema %}
