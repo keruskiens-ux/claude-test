@@ -1,0 +1,114 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin theme editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
+{
+  "sections": {
+    "1784872648414b1bc8": {
+      "type": "_blocks",
+      "blocks": {
+        "ai_gen_block_b4253db_3QqjRq": {
+          "type": "ai_gen_block_b4253db",
+          "settings": {
+            "video": "shopify://files/videos/Premium luxury car interior with sleek black leather seats and soft blue ambient lighting along the dashboard and door panels, high-end steering wheel in sharp focus, increased dynamic smooth camera movement with more mot-2.mp4",
+            "heading": "Upgrade Your Ride",
+            "subheading": "Premium car accessories for every journey",
+            "heading_size": 56,
+            "subheading_size": 20,
+            "text_color": "#ffffff",
+            "button_label": "Shop Now",
+            "button_url": "shopify://collections/all",
+            "button_bg_color": "#ffffff",
+            "button_text_color": "#1a1e2e",
+            "button_hover_bg_color": "#334fb4",
+            "button_hover_text_color": "#ffffff"
+          },
+          "blocks": {}
+        }
+      },
+      "block_order": [
+        "ai_gen_block_b4253db_3QqjRq"
+      ],
+      "settings": {}
+    },
+    "featured_collection": {
+      "type": "featured-collection",
+      "settings": {
+        "collection": "all",
+        "products_to_show": 8,
+        "title": "Featured products",
+        "heading_size": "h2",
+        "description": "",
+        "show_description": false,
+        "description_style": "body",
+        "columns_desktop": 4,
+        "enable_desktop_slider": false,
+        "full_width": false,
+        "show_view_all": true,
+        "view_all_style": "outline",
+        "color_scheme": "scheme-1",
+        "image_ratio": "adapt",
+        "image_shape": "default",
+        "show_secondary_image": true,
+        "show_vendor": false,
+        "show_rating": false,
+        "quick_add": "none",
+        "columns_mobile": "2",
+        "swipe_on_mobile": false,
+        "padding_top": 44,
+        "padding_bottom": 36
+      }
+    },
+    "178485525975ef5e1b": {
+      "type": "_blocks",
+      "blocks": {
+        "ai_gen_block_abb0d89_7TfKCe": {
+          "type": "ai_gen_block_abb0d89",
+          "settings": {
+            "show_badge_1": true,
+            "badge_1_text": "Secure Checkout",
+            "show_badge_2": true,
+            "badge_2_text": "30-Day Returns",
+            "show_badge_3": true,
+            "badge_3_text": "",
+            "show_badge_4": true,
+            "badge_4_text": "Friendly Customer Support",
+            "alignment": "center",
+            "desktop_width_percent": 100,
+            "padding_vertical": 16,
+            "badge_spacing": 32,
+            "badge_spacing_mobile": 20,
+            "icon_size": 32,
+            "icon_size_mobile": 24,
+            "icon_color": "#ffffff",
+            "icon_text_gap": 8,
+            "text_size": 13,
+            "text_size_mobile": 11,
+            "text_color": "#ffffff",
+            "text_weight": "500"
+          },
+          "blocks": {}
+        }
+      },
+      "block_order": [
+        "ai_gen_block_abb0d89_7TfKCe"
+      ],
+      "settings": {}
+    },
+    "178485537720d8e74c": {
+      "type": "_blocks",
+      "settings": {}
+    }
+  },
+  "order": [
+    "1784872648414b1bc8",
+    "featured_collection",
+    "178485525975ef5e1b",
+    "178485537720d8e74c"
+  ]
+}
