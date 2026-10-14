@@ -47,10 +47,11 @@ Before publishing, check in the theme editor:
 Limits of the acknowledgment: someone who goes straight to `/checkout` skips the cart page. A real checkout
 checkbox needs Shopify Plus or a terms-checkbox app; this is the free version the handoff describes.
 
-### Catalog — CSV ready, not imported
-`products/golf-empire-products.csv` → **Products → Import**. All three import as **Draft**, vendor *Golf Empire*,
-with the tags the smart collections match on, the required opening disclosure, and the closing
-"Not affiliated…" line. No compare-at prices.
+### Catalog — created in the store as DRAFT
+All three products from `products/golf-empire-products.csv` were created on 2026-10-14 through the Admin API, status
+**Draft** (not buyable, not on any sales channel). Vendor *Golf Empire*, the tags the smart collections match on, the
+required opening disclosure and closing "Not affiliated…" line, all 9 SKUs, no compare-at prices, inventory not
+tracked. The CSV remains the source of truth if they ever need re-importing.
 
 The descriptions contain **only** what the handoff states (piece count, lofts, flex options). Head material,
 shaft weight, bounce, hosel adjustability range, swing weights, handedness etc. are **deliberately missing** — add
@@ -71,10 +72,9 @@ Fix: Settings → Policies → Refund policy → `<>` (HTML view) → replace wi
 Same for Shipping policy with `docs/policies/shipping-policy.html`. Change the trade name to Golf Empire, then
 regenerate Privacy and Terms from Shopify's templates.
 
-### Copy worth a second look
-The live **About Us** page says the methods and materials "come out of the same factories and the same processes"
-as the major brands. Unless you can prove that, it's an unsubstantiated claim, and it implies a link to the brands
-the rest of the site disclaims. I'd cut that sentence. (The FAQ's "same construction methods" wording is fine.)
+### Copy
+The About Us sentence claiming the clubs "come out of the same factories and the same processes" as the major
+brands was removed on 2026-10-14. It was unprovable. Don't claim anything about where the clubs are made.
 
 ## Working on the theme
 
