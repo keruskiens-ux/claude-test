@@ -97,6 +97,6 @@ Never push to the live theme directly. Make changes on the staging theme and pub
 House rules for anything added to the theme:
 - No brand names, logos or photography — not in copy, alt text, tags or images.
 - Nothing may contradict the final-sale policy and its carve-outs (damaged / defective / not-as-described /
-  never-delivered, and cancellation if the 1–3 business-day dispatch time is missed).
+  never-delivered, and cancellation if the 7-business-day dispatch time is missed).
 - Trust-strip stats must be literally true. No invented customer counts or ratings.
 - No strikethrough compare-at prices unless the item genuinely sold at that price.
