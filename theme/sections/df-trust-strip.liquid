@@ -1,4 +1,5 @@
 {{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'df-motion.js' | asset_url }}" defer="defer"></script>
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -20,7 +21,7 @@
 {% endcomment %}
 <div class="color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
-    <ul class="df-stats" role="list">
+    <ul class="df-stats" role="list" data-df-reveal>
       {%- for block in section.blocks -%}
         <li class="df-stats__item" {{ block.shopify_attributes }}>
           <span class="df-stats__value">{{ block.settings.value | escape }}</span>

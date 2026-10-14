@@ -9,6 +9,18 @@
  */
 {
   "sections": {
+    "df_3d": {
+      "type": "df-3d-hero",
+      "settings": {
+        "eyebrow": "Drive Fresh",
+        "heading_1": "Golf gear for every round.",
+        "heading_2": "Clubs, bags, training aids and more.",
+        "heading_3": "Fair prices. Tracked delivery.",
+        "button_label": "Shop all products",
+        "button_link": "shopify://collections/all",
+        "scroll_length": 250
+      }
+    },
     "df_tiles": {
       "type": "df-category-grid",
       "blocks": {
@@ -240,11 +252,53 @@
         "padding_top": 72,
         "padding_bottom": 72
       }
+    },
+    "df_marquee": {
+      "type": "df-marquee",
+      "blocks": {
+        "line_1": {
+          "type": "line",
+          "settings": {
+            "text": "Golf gear for every round"
+          }
+        },
+        "line_2": {
+          "type": "line",
+          "settings": {
+            "text": "Free shipping over $75"
+          }
+        },
+        "line_3": {
+          "type": "line",
+          "settings": {
+            "text": "Tracked delivery"
+          }
+        },
+        "line_4": {
+          "type": "line",
+          "settings": {
+            "text": "Fair prices"
+          }
+        }
+      },
+      "block_order": [
+        "line_1",
+        "line_2",
+        "line_3",
+        "line_4"
+      ],
+      "settings": {
+        "outline": true,
+        "speed": 40,
+        "color_scheme": "scheme-5"
+      }
     }
   },
   "order": [
+    "df_3d",
     "df_tiles",
     "df_trust",
+    "df_marquee",
     "featured_collection",
     "df_story",
     "df_timeline",

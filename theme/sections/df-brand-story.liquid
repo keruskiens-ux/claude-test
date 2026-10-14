@@ -1,4 +1,5 @@
 {{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'df-motion.js' | asset_url }}" defer="defer"></script>
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -14,14 +15,15 @@
   }
 {%- endstyle -%}
 
-<div class="color-{{ section.settings.color_scheme }} gradient">
+<div class="df-band" data-df-scrub>
+  <div class="df-band__fill color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
     <div class="df-story{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
       {%- if section.settings.eyebrow != blank -%}
         <p class="df-eyebrow">{{ section.settings.eyebrow | escape }}</p>
       {%- endif -%}
       {%- if section.settings.heading != blank -%}
-        <h2 class="df-story__heading h1">{{ section.settings.heading }}</h2>
+        <h2 class="df-story__heading h1" data-df-split>{{ section.settings.heading }}</h2>
       {%- endif -%}
       {%- if section.settings.text != blank -%}
         <div class="df-story__text rte">{{ section.settings.text }}</div>
@@ -36,6 +38,7 @@
       <p class="df-story__fineprint">Not affiliated with any golf equipment manufacturer.</p>
     </div>
   </div>
+</div>
 </div>
 
 {% schema %}

@@ -1,4 +1,5 @@
 {{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'df-motion.js' | asset_url }}" defer="defer"></script>
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -11,7 +12,9 @@
       padding-top: {{ section.settings.padding_top }}px;
       padding-bottom: {{ section.settings.padding_bottom }}px;
     }
+  }
 
+  @media screen and (min-width: 990px) {
     #DfTiles-{{ section.id }} {
       grid-template-columns: repeat({{ section.settings.columns_desktop }}, minmax(0, 1fr));
     }
@@ -26,7 +29,7 @@
 <div class="color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
     {%- if section.settings.heading != blank -%}
-      <h2 class="df-tiles__heading {{ section.settings.heading_size }}">{{ section.settings.heading }}</h2>
+      <h2 class="df-tiles__heading {{ section.settings.heading_size }}" data-df-split>{{ section.settings.heading }}</h2>
     {%- endif -%}
     <ul class="df-tiles" id="DfTiles-{{ section.id }}" role="list">
       {%- for block in section.blocks -%}

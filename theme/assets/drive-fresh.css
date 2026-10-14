@@ -297,40 +297,91 @@
 /* ---------- Category tiles ---------- */
 .df-tiles__heading {
   margin: 0 0 2.4rem;
+  font-size: 1.2rem;
+  font-family: var(--font-body-family);
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgb(var(--df-accent));
 }
 
+/* Mobile: swipeable row, ~1.2 cards visible, snaps per card */
 .df-tiles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.2rem;
-  margin: 0;
-  padding: 0;
+  grid-auto-flow: column;
+  grid-auto-columns: 80%;
+  gap: 1.6rem;
+  margin: 0 -1.5rem;
+  padding: 0.8rem 1.5rem 2.4rem;
   list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 1.5rem;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.df-tiles::-webkit-scrollbar {
+  display: none;
+}
+
+.df-tiles__item {
+  scroll-snap-align: start;
 }
 
 @media screen and (min-width: 750px) {
   .df-tiles {
-    gap: 2rem;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2.4rem;
+    margin: 0;
+    padding: 0.8rem 0 1.6rem;
+    overflow: visible;
+  }
+}
+
+@media screen and (min-width: 990px) {
+  .df-tiles {
+    gap: 2.8rem;
   }
 }
 
 .df-tile {
   position: relative;
   display: block;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   border-radius: 1.2rem;
-  background: rgb(var(--df-pine));
+  background: #2b1d14;
   color: #fff;
   text-decoration: none;
   isolation: isolate;
+  box-shadow:
+    0 1px 2px rgba(43, 29, 20, 0.08),
+    0 20px 44px -14px rgba(43, 29, 20, 0.28);
+  transform: translateY(0);
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 .df-tile--empty {
-  border: 1px solid rgba(var(--df-brass), 0.45);
   background:
-    radial-gradient(120% 80% at 50% 0%, rgba(var(--df-brass), 0.18), transparent 60%),
-    rgb(var(--df-pine));
+    radial-gradient(90% 70% at 50% 15%, rgba(226, 196, 138, 0.35), transparent 65%),
+    linear-gradient(160deg, #6b4a2f 0%, #2b1d14 100%);
+}
+
+.df-tile--empty::before {
+  /* faint golf-ball dimple texture so empty cards aren't flat */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.07) 1.5px, transparent 2px);
+  background-size: 14px 14px;
+  mask-image: radial-gradient(70% 60% at 50% 35%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 35%, #000 0%, transparent 75%);
 }
 
 .df-tile__img {
@@ -339,58 +390,523 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s ease;
+  transform: scale(1.001);
+  transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Legibility gradient: dark at the bottom where the label sits */
 .df-tile::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 45%);
+  background: linear-gradient(
+    to top,
+    rgba(26, 17, 11, 0.82) 0%,
+    rgba(26, 17, 11, 0.45) 28%,
+    rgba(26, 17, 11, 0) 55%
+  );
+  transition: opacity 0.5s ease;
 }
 
 .df-tile__label {
   position: absolute;
-  left: 1.6rem;
-  right: 1.6rem;
-  bottom: 1.6rem;
+  left: 2rem;
+  right: 2rem;
+  bottom: 2rem;
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  font-family: var(--font-heading-family);
-  font-size: 1.8rem;
+  justify-content: space-between;
+  gap: 1.2rem;
+  font-family: var(--font-body-family);
+  font-size: 1.4rem;
+  font-weight: 600;
   line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: #fff;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+  -webkit-font-smoothing: antialiased;
 }
 
-@media screen and (min-width: 750px) {
+@media screen and (min-width: 990px) {
   .df-tile__label {
-    left: 2.4rem;
-    bottom: 2.4rem;
-    font-size: 2.4rem;
+    left: 2.8rem;
+    right: 2.8rem;
+    bottom: 2.6rem;
+    font-size: 1.5rem;
   }
 }
 
 .df-tile__arrow {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3.8rem;
+  height: 3.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
   font-family: var(--font-body-family);
-  transition: transform 0.3s ease;
+  font-size: 1.6rem;
+  letter-spacing: 0;
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    color 0.4s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (hover: hover) {
+  .df-tile:hover {
+    transform: translateY(-6px);
+    box-shadow:
+      0 2px 4px rgba(43, 29, 20, 0.1),
+      0 32px 64px -18px rgba(43, 29, 20, 0.38);
+  }
+
   .df-tile:hover .df-tile__img {
-    transform: scale(1.05);
+    transform: scale(1.06);
   }
 
   .df-tile:hover .df-tile__arrow {
-    transform: translateX(0.4rem);
+    background: #e2c48a;
+    border-color: #e2c48a;
+    color: #2b1d14;
+    transform: translateX(4px);
   }
 }
 
 .df-tile:focus-visible {
   outline: 2px solid rgb(var(--df-brass));
-  outline-offset: 3px;
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df-tile,
+  .df-tile__img,
+  .df-tile__arrow {
+    transition: none;
+  }
+}
+
+/* ---------- 3D drive intro ---------- */
+.df3d {
+  position: relative;
+  display: block;
+  height: var(--df3d-length, 250vh);
+  background: #f6eedf;
+}
+
+.df3d__sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.df3d__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.df3d--ready .df3d__canvas {
+  opacity: 1;
+}
+
+.df3d__copy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  padding: 13vh 2rem 0;
+  pointer-events: none;
+}
+
+.df3d__beat {
+  grid-area: 1 / 1;
+  max-width: 82rem;
+  text-align: center;
+  color: #2b1d14;
+  will-change: opacity, transform, filter;
+}
+
+.df3d__eyebrow {
+  margin: 0 0 1.6rem;
+  font-family: var(--font-body-family);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #8a6235;
+}
+
+.df3d__title {
+  margin: 0;
+  font-family: var(--font-heading-family);
+  font-weight: var(--font-heading-weight);
+  font-size: clamp(3.4rem, 7vw, 8.4rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #2b1d14;
+}
+
+.df3d__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-top: 3.2rem;
+  padding: 1.6rem 3rem;
+  border-radius: 999px;
+  background: #4a2f1b;
+  color: #faf6ee;
+  font-family: var(--font-body-family);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 14px 30px -12px rgba(43, 29, 20, 0.5);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+.df3d__cta:hover {
+  background: #2b1d14;
+  transform: translateY(-2px);
+}
+
+.df3d__hint {
+  position: absolute;
+  left: 50%;
+  bottom: 1.6rem;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  font-family: var(--font-body-family);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #6b4a2f;
+}
+
+.df3d__hint-line {
+  width: 1px;
+  height: 4.4rem;
+  background: linear-gradient(#6b4a2f, transparent);
+  animation: df3d-hint 1.8s ease-in-out infinite;
+  transform-origin: top;
+}
+
+@keyframes df3d-hint {
+  0% { transform: scaleY(0); opacity: 1; }
+  60% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+
+/* No WebGL / no script: a short, still title card instead of a tall scroll. */
+.df3d--static {
+  height: auto;
+}
+
+.df3d--static .df3d__sticky {
+  position: relative;
+  height: 70vh;
+  background:
+    radial-gradient(60% 50% at 50% 70%, rgba(226, 196, 138, 0.45), transparent 70%),
+    #f6eedf;
+}
+
+.df3d--static .df3d__beat:not(:first-child),
+.df3d--static .df3d__hint {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df3d__hint-line {
+    animation: none;
+  }
+}
+
+/* Intro loader: covers the 3D scene for about a second on the first visit. */
+.df3d__loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #2b1d14;
+  color: #faf6ee;
+  animation: df-loader-out 0.6s ease 2.4s forwards;
+  transition: clip-path 0.7s cubic-bezier(0.76, 0, 0.24, 1);
+  clip-path: inset(0 0 0 0);
+}
+
+.df3d__loader--done {
+  clip-path: inset(0 0 100% 0);
+  pointer-events: none;
+}
+
+.df3d__loader-inner {
+  display: grid;
+  justify-items: center;
+  gap: 2.4rem;
+}
+
+.df3d__loader-word {
+  display: flex;
+  overflow: hidden;
+  font-family: var(--font-heading-family);
+  font-weight: var(--font-heading-weight);
+  font-size: clamp(3.2rem, 6vw, 6.4rem);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+
+.df3d__loader-word span {
+  display: inline-block;
+  transform: translateY(110%);
+  animation: df-letter-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--i) * 35ms + 0.1s);
+}
+
+/* A ball rolls along a short green line and drops into the cup. */
+.df3d__loader-green {
+  position: relative;
+  width: 16rem;
+  height: 1.2rem;
+  border-bottom: 1px solid rgba(226, 196, 138, 0.5);
+}
+
+.df3d__loader-cup {
+  position: absolute;
+  right: 0;
+  bottom: -0.4rem;
+  width: 1.4rem;
+  height: 0.7rem;
+  border-radius: 0 0 1rem 1rem;
+  background: #120b07;
+}
+
+.df3d__loader-ball {
+  position: absolute;
+  left: 0;
+  bottom: 0.1rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #faf6ee;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.12);
+  animation: df-putt 0.9s cubic-bezier(0.3, 0.6, 0.4, 1) 0.25s forwards;
+}
+
+@keyframes df-letter-up {
+  to { transform: translateY(0); }
+}
+
+@keyframes df-putt {
+  0% { transform: translate(0, 0); }
+  85% { transform: translate(14.2rem, 0); opacity: 1; }
+  100% { transform: translate(14.2rem, 0.7rem); opacity: 0; }
+}
+
+@keyframes df-loader-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df3d__loader {
+    display: none;
+  }
+}
+
+/* ---------- Scroll motion (assets/df-motion.js) ----------
+   Hidden start states only apply once the script has added .df-motion,
+   so without JavaScript everything simply shows. */
+
+/* Headline words rise out of a mask */
+.df-w {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.df-w__i {
+  display: inline-block;
+}
+
+.df-motion:not(.df-motion--reduced) [data-df-split] .df-w__i {
+  transform: translateY(105%);
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--i, 0) * 60ms);
+}
+
+.df-motion [data-df-split].df-in .df-w__i {
+  transform: none;
+}
+
+/* Trust strip: values count in one after another, with a gold rule drawing under each */
+.df-motion:not(.df-motion--reduced) .df-stats[data-df-reveal] .df-stats__item {
+  opacity: 0;
+  transform: translateY(2.4rem);
+  transition: opacity 0.7s ease, transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.df-stats__item:nth-child(2) { --d: 1; }
+.df-stats__item:nth-child(3) { --d: 2; }
+.df-stats__item:nth-child(4) { --d: 3; }
+
+.df-motion .df-stats[data-df-reveal].df-in .df-stats__item {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--d, 0) * 110ms);
+}
+
+.df-stats__value::after {
+  content: '';
+  display: block;
+  width: 3.2rem;
+  height: 2px;
+  margin: 1rem auto 0;
+  background: #e2c48a;
+  transform-origin: left;
+}
+
+.df-motion:not(.df-motion--reduced) .df-stats[data-df-reveal] .df-stats__value::after {
+  transform: scaleX(0);
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.df-motion .df-stats[data-df-reveal].df-in .df-stats__value::after {
+  transform: scaleX(1);
+  transition-delay: calc(var(--d, 0) * 110ms + 0.35s);
+}
+
+/* Brand story: a rounded colour card that grows to full width as you scroll in */
+.df-band__fill {
+  --df-q: calc(1 - var(--df-p, 1));
+  clip-path: inset(calc(var(--df-q) * 6rem) calc(var(--df-q) * 6vw) round calc(var(--df-q) * 4rem));
+}
+
+.df-band__fill .df-story {
+  transform: translateY(calc(var(--df-q) * 4rem));
+}
+
+/* Delivery timeline: each step pops in, then the connector draws to the next */
+.df-motion:not(.df-motion--reduced) .df-timeline[data-df-reveal] .df-timeline__step {
+  opacity: 0;
+  transform: translateY(2rem);
+  transition: opacity 0.6s ease, transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.df-timeline__step:nth-child(2) { --d: 1; }
+.df-timeline__step:nth-child(3) { --d: 2; }
+
+.df-motion .df-timeline[data-df-reveal].df-in .df-timeline__step {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--d, 0) * 0.45s);
+}
+
+@media screen and (min-width: 750px) {
+  .df-timeline__step:not(:last-child)::after {
+    transform-origin: left;
+  }
+
+  .df-motion:not(.df-motion--reduced) .df-timeline[data-df-reveal] .df-timeline__step:not(:last-child)::after {
+    transform: scaleX(0);
+    transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+
+  .df-motion .df-timeline[data-df-reveal].df-in .df-timeline__step:not(:last-child)::after {
+    transform: scaleX(1);
+    transition-delay: calc(var(--d, 0) * 0.45s + 0.3s);
+  }
+}
+
+.df-motion .df-timeline[data-df-reveal].df-in .df-timeline__step::before {
+  animation: df-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--d, 0) * 0.45s);
+}
+
+@keyframes df-pop {
+  0% { transform: scale(0.4); background: transparent; }
+  60% { background: rgba(226, 196, 138, 0.35); }
+  100% { transform: scale(1); background: transparent; }
+}
+
+/* ---------- Scrolling type band ---------- */
+.df-marquee {
+  overflow: hidden;
+  padding: 3.2rem 0;
+}
+
+.df-marquee__viewport {
+  display: flex;
+  overflow: hidden;
+}
+
+.df-marquee__track {
+  display: flex;
+  flex: none;
+  animation: df-marquee var(--df-marquee-speed, 40s) linear infinite;
+}
+
+.df-marquee__run {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.df-marquee__item {
+  flex: none;
+  padding: 0 3.2rem;
+  font-family: var(--font-heading-family);
+  font-weight: var(--font-heading-weight);
+  font-size: clamp(4.4rem, 9vw, 12rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(var(--color-foreground));
+}
+
+.df-marquee__item--outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px #e2c48a;
+}
+
+/* Golf ball as the separator */
+.df-marquee__ball {
+  flex: none;
+  width: clamp(2.4rem, 3.4vw, 4.4rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0 18%, transparent 19%),
+    radial-gradient(rgba(43, 29, 20, 0.16) 18%, transparent 22%) 0 0 / 22% 22%,
+    #faf6ee;
+  box-shadow: inset -0.4rem -0.4rem 0.8rem rgba(43, 29, 20, 0.25);
+}
+
+@keyframes df-marquee {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df-marquee__track {
+    animation: none;
+  }
 }
 
 /* ---------- Floating contact ---------- */
