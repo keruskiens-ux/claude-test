@@ -95,7 +95,7 @@
         "stat_1": {
           "type": "stat",
           "settings": {
-            "value": "2–4 wks",
+            "value": "2-4 wks",
             "label": "Tracked, insured delivery"
           }
         },
@@ -159,7 +159,8 @@
         "swipe_on_mobile": false,
         "padding_top": 36,
         "padding_bottom": 72
-      }
+      },
+      "disabled": true
     },
     "df_story": {
       "type": "df-brand-story",
