@@ -9,23 +9,23 @@
  */
 {
   "current": {
-    "logo": "shopify://shop_images/auto_crop_TUFIUVBvTEN3dlEjMSNkMDlhMDE3NDc2MTEwZDFlYWIyOThjZjZlM2MxZmE1ZCMxMjQ4IyNUUkFOU0ZPUk1BVElPTl9SRVFVRVNU.png",
+    "logo": "",
     "logo_width": 150,
-    "favicon": "shopify://shop_images/drive-fresh-favicon.png",
-    "type_header_font": "assistant_n4",
-    "heading_scale": 110,
-    "type_body_font": "assistant_n4",
+    "favicon": "",
+    "type_header_font": "bodoni_moda_n5",
+    "heading_scale": 115,
+    "type_body_font": "inter_n4",
     "body_scale": 100,
     "page_width": 1200,
     "spacing_sections": 0,
     "spacing_grid_horizontal": 16,
     "spacing_grid_vertical": 16,
     "animations_reveal_on_scroll": true,
-    "animations_hover_elements": "vertical-lift",
+    "animations_hover_elements": "none",
     "buttons_border_thickness": 1,
     "buttons_border_opacity": 100,
-    "buttons_radius": 6,
-    "buttons_shadow_opacity": 20,
+    "buttons_radius": 2,
+    "buttons_shadow_opacity": 0,
     "buttons_shadow_horizontal_offset": 0,
     "buttons_shadow_vertical_offset": 4,
     "buttons_shadow_blur": 10,
@@ -38,30 +38,30 @@
     "variant_pills_shadow_blur": 5,
     "inputs_border_thickness": 1,
     "inputs_border_opacity": 55,
-    "inputs_radius": 6,
+    "inputs_radius": 2,
     "inputs_shadow_opacity": 0,
     "inputs_shadow_horizontal_offset": 0,
     "inputs_shadow_vertical_offset": 4,
     "inputs_shadow_blur": 5,
-    "card_style": "card",
+    "card_style": "standard",
     "card_image_padding": 0,
     "card_text_alignment": "left",
-    "card_color_scheme": "scheme-2",
+    "card_color_scheme": "scheme-1",
     "card_border_thickness": 0,
     "card_border_opacity": 10,
-    "card_corner_radius": 8,
-    "card_shadow_opacity": 30,
+    "card_corner_radius": 2,
+    "card_shadow_opacity": 0,
     "card_shadow_horizontal_offset": 0,
     "card_shadow_vertical_offset": 6,
     "card_shadow_blur": 20,
-    "collection_card_style": "card",
+    "collection_card_style": "standard",
     "collection_card_image_padding": 0,
     "collection_card_text_alignment": "left",
-    "collection_card_color_scheme": "scheme-2",
+    "collection_card_color_scheme": "scheme-1",
     "collection_card_border_thickness": 0,
     "collection_card_border_opacity": 10,
-    "collection_card_corner_radius": 8,
-    "collection_card_shadow_opacity": 30,
+    "collection_card_corner_radius": 2,
+    "collection_card_shadow_opacity": 0,
     "collection_card_shadow_horizontal_offset": 0,
     "collection_card_shadow_vertical_offset": 6,
     "collection_card_shadow_blur": 20,
@@ -85,8 +85,8 @@
     "text_boxes_shadow_blur": 5,
     "media_border_thickness": 1,
     "media_border_opacity": 5,
-    "media_radius": 8,
-    "media_shadow_opacity": 15,
+    "media_radius": 2,
+    "media_shadow_opacity": 0,
     "media_shadow_horizontal_offset": 0,
     "media_shadow_vertical_offset": 6,
     "media_shadow_blur": 15,
@@ -104,7 +104,7 @@
     "drawer_shadow_vertical_offset": 4,
     "drawer_shadow_blur": 5,
     "badge_position": "bottom left",
-    "badge_corner_radius": 6,
+    "badge_corner_radius": 2,
     "sale_badge_color_scheme": "scheme-4",
     "sold_out_badge_color_scheme": "scheme-3",
     "brand_headline": "",
@@ -123,7 +123,7 @@
     "predictive_search_show_vendor": false,
     "predictive_search_show_price": false,
     "currency_code_enabled": true,
-    "cart_type": "notification",
+    "cart_type": "page",
     "show_vendor": false,
     "show_cart_note": false,
     "cart_drawer_collection": "",
@@ -146,57 +146,57 @@
     "color_schemes": {
       "scheme-1": {
         "settings": {
-          "background": "#1a1e2e",
+          "background": "#EDE8DC",
           "background_gradient": "",
-          "text": "#ffffff",
-          "button": "#ffffff",
-          "button_label": "#1a1e2e",
-          "secondary_button_label": "#ffffff",
-          "shadow": "#121212"
+          "text": "#102A1C",
+          "button": "#102A1C",
+          "button_label": "#EDE8DC",
+          "secondary_button_label": "#102A1C",
+          "shadow": "#102A1C"
         }
       },
       "scheme-2": {
         "settings": {
-          "background": "#242833",
+          "background": "#E3DCCB",
           "background_gradient": "",
-          "text": "#ffffff",
-          "button": "#ffffff",
-          "button_label": "#242833",
-          "secondary_button_label": "#ffffff",
-          "shadow": "#121212"
+          "text": "#102A1C",
+          "button": "#102A1C",
+          "button_label": "#EDE8DC",
+          "secondary_button_label": "#102A1C",
+          "shadow": "#102A1C"
         }
       },
       "scheme-3": {
         "settings": {
-          "background": "#0d1117",
+          "background": "#102A1C",
           "background_gradient": "",
-          "text": "#ffffff",
-          "button": "#ffffff",
-          "button_label": "#0d1117",
-          "secondary_button_label": "#ffffff",
-          "shadow": "#121212"
+          "text": "#EDE8DC",
+          "button": "#C2A05C",
+          "button_label": "#102A1C",
+          "secondary_button_label": "#EDE8DC",
+          "shadow": "#102A1C"
         }
       },
       "scheme-4": {
         "settings": {
-          "background": "#121212",
+          "background": "#C2A05C",
           "background_gradient": "",
-          "text": "#ffffff",
-          "button": "#ffffff",
-          "button_label": "#121212",
-          "secondary_button_label": "#ffffff",
-          "shadow": "#121212"
+          "text": "#102A1C",
+          "button": "#102A1C",
+          "button_label": "#EDE8DC",
+          "secondary_button_label": "#102A1C",
+          "shadow": "#102A1C"
         }
       },
       "scheme-5": {
         "settings": {
-          "background": "#334fb4",
+          "background": "#0A1D13",
           "background_gradient": "",
-          "text": "#ffffff",
-          "button": "#ffffff",
-          "button_label": "#334fb4",
-          "secondary_button_label": "#ffffff",
-          "shadow": "#121212"
+          "text": "#EDE8DC",
+          "button": "#EDE8DC",
+          "button_label": "#102A1C",
+          "secondary_button_label": "#EDE8DC",
+          "shadow": "#102A1C"
         }
       }
     }

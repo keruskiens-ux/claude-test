@@ -104,6 +104,25 @@
                 </small>
               </div>
             {%- else -%}
+              {%- render 'ge-final-sale-notice', context: 'cart' -%}
+              <div class="ge-terms">
+                <input
+                  type="checkbox"
+                  id="GeTermsAck"
+                  name="attributes[Final sale acknowledged]"
+                  value="Yes"
+                  form="cart"
+                  required
+                  {% if cart.attributes['Final sale acknowledged'] == 'Yes' %}
+                    checked
+                  {% endif %}
+                >
+                <label for="GeTermsAck">
+                  I understand delivery takes 2–4 weeks and that all sales are final except for damaged, defective, or
+                  incorrect items.
+                </label>
+              </div>
+              <p class="ge-terms__hint" id="GeTermsHint">Tick the box above to continue to checkout.</p>
               <div class="cart__ctas" {{ block.shopify_attributes }}>
                 <button
                   type="submit"
@@ -120,7 +139,7 @@
               </div>
 
               {%- if additional_checkout_buttons -%}
-                <div class="cart__dynamic-checkout-buttons additional-checkout-buttons">
+                <div class="cart__dynamic-checkout-buttons additional-checkout-buttons" id="GeExpressCheckout">
                   {{ content_for_additional_checkout_buttons }}
                 </div>
               {%- endif -%}
@@ -128,6 +147,30 @@
         {% endfor %}
 
         <div id="cart-errors"></div>
+        <script>
+          (function () {
+            // Express buttons (Shop Pay, PayPal…) skip the cart form, so the checkbox's
+            // `required` can't stop them: lock them until it's ticked, and save the
+            // acknowledgment to the cart so it lands on the order as a cart attribute.
+            var box = document.getElementById('GeTermsAck');
+            if (!box) return;
+            var express = document.getElementById('GeExpressCheckout');
+            var hint = document.getElementById('GeTermsHint');
+            function sync() {
+              if (express) express.classList.toggle('ge-terms-locked', !box.checked);
+              if (hint) hint.hidden = box.checked;
+            }
+            box.addEventListener('change', function () {
+              sync();
+              fetch(window.Shopify && Shopify.routes ? Shopify.routes.root + 'cart/update.js' : '/cart/update.js', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ attributes: { 'Final sale acknowledged': box.checked ? 'Yes' : '' } }),
+              });
+            });
+            sync();
+          })();
+        </script>
       </div>
     </div>
   </div>
