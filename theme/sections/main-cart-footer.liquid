@@ -104,11 +104,11 @@
                 </small>
               </div>
             {%- else -%}
-              {%- render 'ge-final-sale-notice', context: 'cart' -%}
-              <div class="ge-terms">
+              {%- render 'df-final-sale-notice', context: 'cart' -%}
+              <div class="df-terms">
                 <input
                   type="checkbox"
-                  id="GeTermsAck"
+                  id="DfTermsAck"
                   name="attributes[Final sale acknowledged]"
                   value="Yes"
                   form="cart"
@@ -117,12 +117,12 @@
                     checked
                   {% endif %}
                 >
-                <label for="GeTermsAck">
+                <label for="DfTermsAck">
                   I understand delivery takes 2–4 weeks and that all sales are final except for damaged, defective, or
                   incorrect items.
                 </label>
               </div>
-              <p class="ge-terms__hint" id="GeTermsHint">Tick the box above to continue to checkout.</p>
+              <p class="df-terms__hint" id="DfTermsHint">Tick the box above to continue to checkout.</p>
               <div class="cart__ctas" {{ block.shopify_attributes }}>
                 <button
                   type="submit"
@@ -139,7 +139,7 @@
               </div>
 
               {%- if additional_checkout_buttons -%}
-                <div class="cart__dynamic-checkout-buttons additional-checkout-buttons" id="GeExpressCheckout">
+                <div class="cart__dynamic-checkout-buttons additional-checkout-buttons" id="DfExpressCheckout">
                   {{ content_for_additional_checkout_buttons }}
                 </div>
               {%- endif -%}
@@ -152,12 +152,12 @@
             // Express buttons (Shop Pay, PayPal…) skip the cart form, so the checkbox's
             // `required` can't stop them: lock them until it's ticked, and save the
             // acknowledgment to the cart so it lands on the order as a cart attribute.
-            var box = document.getElementById('GeTermsAck');
+            var box = document.getElementById('DfTermsAck');
             if (!box) return;
-            var express = document.getElementById('GeExpressCheckout');
-            var hint = document.getElementById('GeTermsHint');
+            var express = document.getElementById('DfExpressCheckout');
+            var hint = document.getElementById('DfTermsHint');
             function sync() {
-              if (express) express.classList.toggle('ge-terms-locked', !box.checked);
+              if (express) express.classList.toggle('df-terms-locked', !box.checked);
               if (hint) hint.hidden = box.checked;
             }
             box.addEventListener('change', function () {

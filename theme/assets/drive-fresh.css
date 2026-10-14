@@ -1,61 +1,61 @@
-/* Golf Empire — shared styles for ge-* sections and snippets.
+/* Drive Fresh — shared styles for ge-* sections and snippets.
    Palette: pine #102A1C · bone #EDE8DC · brass #C2A05C */
 
 :root {
-  --ge-pine: 16, 42, 28;
-  --ge-bone: 237, 232, 220;
-  --ge-brass: 194, 160, 92;
+  --df-pine: 16, 42, 28;
+  --df-bone: 237, 232, 220;
+  --df-brass: 194, 160, 92;
 }
 
 /* Brass is only legible on pine. Light schemes get a darker brass for text. */
 .gradient,
-.ge-final-sale {
-  --ge-accent: 107, 82, 34;
+.df-final-sale {
+  --df-accent: 107, 82, 34;
 }
 
 .color-scheme-3,
 .color-scheme-5 {
-  --ge-accent: var(--ge-brass);
+  --df-accent: var(--df-brass);
 }
 
-.ge-eyebrow {
+.df-eyebrow {
   font-family: var(--font-body-family);
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgb(var(--ge-accent));
+  color: rgb(var(--df-accent));
   margin: 0 0 1.6rem;
 }
 
 /* ---------- Final-sale disclosure ---------- */
-.ge-final-sale {
+.df-final-sale {
   margin-top: 1.6rem;
   padding: 1.4rem 1.6rem;
   border: 1px solid rgba(var(--color-foreground), 0.25);
-  border-left: 4px solid rgb(var(--ge-brass));
+  border-left: 4px solid rgb(var(--df-brass));
   border-radius: 4px;
   background: rgba(var(--color-foreground), 0.04);
   font-size: 1.4rem;
   line-height: 1.5;
 }
 
-.ge-final-sale__line {
+.df-final-sale__line {
   margin: 0 0 0.4rem;
 }
 
-.ge-final-sale__links {
+.df-final-sale__links {
   margin: 0.8rem 0 0;
   font-size: 1.3rem;
 }
 
-.ge-final-sale--cart {
+.df-final-sale--cart {
   margin: 0 0 1.6rem;
   text-align: left;
 }
 
 /* ---------- Cart terms acknowledgment ---------- */
-.ge-terms {
+.df-terms {
   display: flex;
   gap: 1rem;
   align-items: flex-start;
@@ -65,59 +65,59 @@
   line-height: 1.5;
 }
 
-.ge-terms input {
+.df-terms input {
   flex: none;
   width: 2rem;
   height: 2rem;
   margin: 0.2rem 0 0;
-  accent-color: rgb(var(--ge-accent));
+  accent-color: rgb(var(--df-accent));
 }
 
-.ge-terms__hint {
+.df-terms__hint {
   margin: -0.8rem 0 1.6rem;
   font-size: 1.3rem;
   color: rgba(var(--color-foreground), 0.75);
   text-align: left;
 }
 
-.ge-terms-locked {
+.df-terms-locked {
   opacity: 0.4;
   pointer-events: none;
 }
 
 /* ---------- Hero ---------- */
-.ge-hero__grid {
+.df-hero__grid {
   display: grid;
   gap: 3.2rem;
   align-items: center;
 }
 
 @media screen and (min-width: 990px) {
-  .ge-hero__grid {
+  .df-hero__grid {
     grid-template-columns: 1.1fr 0.9fr;
     gap: 6.4rem;
   }
 }
 
-.ge-hero__heading {
+.df-hero__heading {
   margin: 0 0 2rem;
   line-height: 1.05;
 }
 
-.ge-hero__text {
+.df-hero__text {
   max-width: 48rem;
   margin: 0 0 3.2rem;
   font-size: 1.7rem;
   color: rgba(var(--color-foreground), 0.8);
 }
 
-.ge-hero__buttons {
+.df-hero__buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 1.2rem;
 }
 
-.ge-hero__media {
+.df-hero__media {
   position: relative;
   aspect-ratio: 4 / 5;
   overflow: hidden;
@@ -125,7 +125,7 @@
   background: rgba(var(--color-foreground), 0.06);
 }
 
-.ge-hero__media img {
+.df-hero__media img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -133,22 +133,22 @@
   object-fit: cover;
 }
 
-.ge-hero__media--empty {
+.df-hero__media--empty {
   display: grid;
   place-items: center;
-  background: rgb(var(--ge-pine));
-  border: 1px solid rgba(var(--ge-brass), 0.5);
+  background: rgb(var(--df-pine));
+  border: 1px solid rgba(var(--df-brass), 0.5);
 }
 
-.ge-hero__monogram {
+.df-hero__monogram {
   font-family: var(--font-heading-family);
   font-size: clamp(8rem, 14vw, 16rem);
   letter-spacing: 0.04em;
-  color: rgba(var(--ge-brass), 0.85);
+  color: rgba(var(--df-brass), 0.85);
 }
 
 /* ---------- Trust strip ---------- */
-.ge-stats {
+.df-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2.4rem 1.6rem;
@@ -158,31 +158,31 @@
 }
 
 @media screen and (min-width: 750px) {
-  .ge-stats {
+  .df-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-.ge-stats__item {
+.df-stats__item {
   text-align: center;
   padding: 0 0.8rem;
 }
 
 @media screen and (min-width: 750px) {
-  .ge-stats__item + .ge-stats__item {
-    border-left: 1px solid rgba(var(--ge-accent), 0.4);
+  .df-stats__item + .df-stats__item {
+    border-left: 1px solid rgba(var(--df-accent), 0.4);
   }
 }
 
-.ge-stats__value {
+.df-stats__value {
   display: block;
   font-family: var(--font-heading-family);
   font-size: 3.2rem;
   line-height: 1.1;
-  color: rgb(var(--ge-accent));
+  color: rgb(var(--df-accent));
 }
 
-.ge-stats__label {
+.df-stats__label {
   display: block;
   margin-top: 0.6rem;
   font-size: 1.3rem;
@@ -191,22 +191,22 @@
 }
 
 /* ---------- Brand story ---------- */
-.ge-story {
+.df-story {
   max-width: 76rem;
   margin: 0 auto;
   text-align: center;
 }
 
-.ge-story__heading {
+.df-story__heading {
   margin: 0 0 2.4rem;
 }
 
-.ge-story__text {
+.df-story__text {
   font-size: 1.7rem;
   color: rgba(var(--color-foreground), 0.85);
 }
 
-.ge-story__fineprint {
+.df-story__fineprint {
   margin-top: 2.4rem;
   font-size: 1.2rem;
   letter-spacing: 0.06em;
@@ -214,34 +214,34 @@
 }
 
 /* ---------- Delivery timeline ---------- */
-.ge-timeline__heading {
+.df-timeline__heading {
   text-align: center;
   margin: 0 0 4rem;
 }
 
-.ge-timeline {
+.df-timeline {
   display: grid;
   gap: 3.2rem;
   margin: 0;
   padding: 0;
   list-style: none;
-  counter-reset: ge-step;
+  counter-reset: df-step;
 }
 
 @media screen and (min-width: 750px) {
-  .ge-timeline {
+  .df-timeline {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-.ge-timeline__step {
+.df-timeline__step {
   position: relative;
   padding-top: 5.6rem;
-  counter-increment: ge-step;
+  counter-increment: df-step;
 }
 
-.ge-timeline__step::before {
-  content: counter(ge-step);
+.df-timeline__step::before {
+  content: counter(df-step);
   position: absolute;
   top: 0;
   left: 0;
@@ -249,44 +249,44 @@
   place-items: center;
   width: 4rem;
   height: 4rem;
-  border: 1px solid rgb(var(--ge-accent));
+  border: 1px solid rgb(var(--df-accent));
   border-radius: 50%;
   font-family: var(--font-heading-family);
   font-size: 1.8rem;
-  color: rgb(var(--ge-accent));
+  color: rgb(var(--df-accent));
 }
 
 @media screen and (min-width: 750px) {
-  .ge-timeline__step:not(:last-child)::after {
+  .df-timeline__step:not(:last-child)::after {
     content: '';
     position: absolute;
     top: 2rem;
     left: 5.6rem;
     right: 1.6rem;
-    border-top: 1px solid rgba(var(--ge-accent), 0.4);
+    border-top: 1px solid rgba(var(--df-accent), 0.4);
   }
 }
 
-.ge-timeline__when {
+.df-timeline__when {
   margin: 0 0 0.4rem;
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgb(var(--ge-accent));
+  color: rgb(var(--df-accent));
 }
 
-.ge-timeline__title {
+.df-timeline__title {
   margin: 0 0 0.8rem;
 }
 
-.ge-timeline__text {
+.df-timeline__text {
   margin: 0;
   font-size: 1.5rem;
   color: rgba(var(--color-foreground), 0.8);
 }
 
-.ge-timeline__note {
+.df-timeline__note {
   max-width: 64rem;
   margin: 4rem auto 0;
   text-align: center;

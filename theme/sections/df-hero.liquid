@@ -1,4 +1,4 @@
-{{ 'golf-empire.css' | asset_url | stylesheet_tag }}
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -16,18 +16,18 @@
 
 <div class="color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
-    <div class="ge-hero__grid">
-      <div class="ge-hero__content{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
+    <div class="df-hero__grid">
+      <div class="df-hero__content{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
         {%- if section.settings.eyebrow != blank -%}
-          <p class="ge-eyebrow">{{ section.settings.eyebrow | escape }}</p>
+          <p class="df-eyebrow">{{ section.settings.eyebrow | escape }}</p>
         {%- endif -%}
         {%- if section.settings.heading != blank -%}
-          <h1 class="ge-hero__heading {{ section.settings.heading_size }}">{{ section.settings.heading }}</h1>
+          <h1 class="df-hero__heading {{ section.settings.heading_size }}">{{ section.settings.heading }}</h1>
         {%- endif -%}
         {%- if section.settings.text != blank -%}
-          <div class="ge-hero__text rte">{{ section.settings.text }}</div>
+          <div class="df-hero__text rte">{{ section.settings.text }}</div>
         {%- endif -%}
-        <div class="ge-hero__buttons">
+        <div class="df-hero__buttons">
           {%- if section.settings.button_label_1 != blank -%}
             <a
               {% if section.settings.button_link_1 == blank %}
@@ -55,7 +55,7 @@
         </div>
       </div>
 
-      <div class="ge-hero__media{% if section.settings.image == blank %} ge-hero__media--empty{% endif %}">
+      <div class="df-hero__media{% if section.settings.image == blank %} df-hero__media--empty{% endif %}">
         {%- if section.settings.image != blank -%}
           {{
             section.settings.image
@@ -67,7 +67,7 @@
               widths: '375, 550, 750, 1100, 1400'
           }}
         {%- else -%}
-          <span class="ge-hero__monogram" aria-hidden="true">GE</span>
+          <span class="df-hero__monogram" aria-hidden="true">DF</span>
         {%- endif -%}
       </div>
     </div>
@@ -76,7 +76,7 @@
 
 {% schema %}
 {
-  "name": "GE Hero",
+  "name": "DF Hero",
   "tag": "section",
   "class": "section",
   "disabled_on": {
@@ -93,7 +93,7 @@
       "type": "text",
       "id": "eyebrow",
       "label": "Eyebrow",
-      "default": "Golf Empire"
+      "default": "Drive Fresh"
     },
     {
       "type": "inline_richtext",
@@ -173,7 +173,7 @@
   ],
   "presets": [
     {
-      "name": "GE Hero"
+      "name": "DF Hero"
     }
   ]
 }

@@ -1,11 +1,11 @@
-# Golf Empire — Store Build Handoff
+# Drive Fresh — Store Build Handoff
 
 > Original handoff as of 2026-10-14. For what has since been done, see the **Status** section of the root `README.md`.
 
-**Store:** Golf Empire — `drivefresher.myshopify.com`
+**Store:** Drive Fresh — `drivefresher.myshopify.com`
 **Plan:** Shopify Basic ($20/mo) · USD · United States · timezone EDT
 **Niche:** Unbranded / generic premium golf equipment, dropshipped from AliExpress suppliers
-**Status as of 2026-10-14:** Converted from a car-accessories store ("Drive Fresh"). Content pages and collections are done. Catalog is empty. Theme is still the old car-accessory design.
+**Status as of 2026-10-14:** Converted from car accessories to golf, keeping the Drive Fresh name and logo. Content pages and collections are done. Catalog is empty. Theme is still the old car-accessory design.
 
 ---
 
@@ -71,7 +71,7 @@ The store has **zero products**. Three drafts were created and then deleted. Reb
 **Product 1 — Forged Cavity-Back Iron Set (4-PW, 7 Pieces)**
 - Price $649.00 · Option: Flex → Regular, Stiff
 - SKUs `IRON-FCB-7-R`, `IRON-FCB-7-S`
-- Type: Golf Irons · Vendor: Golf Empire · Tags: `irons`, `iron-set`, `forged`, `cavity-back`
+- Type: Golf Irons · Vendor: Drive Fresh · Tags: `irons`, `iron-set`, `forged`, `cavity-back`
 - Status: DRAFT until photos exist
 
 **Product 2 — Adjustable Carbon-Composite Driver**
@@ -98,11 +98,11 @@ These are **separate** from the content pages above and are what the storefront 
 *Note: the Shopify MCP connection lacks the `write_legal_policies` scope, so this must be done manually in admin.*
 
 ### 5. Theme rebuild
-Still the Drive Fresh car-accessories theme: car interior hero image, "Upgrade Your Ride" headline, Drive Fresh logo, t-shirt placeholder products.
+Still the car-accessories design: car interior hero image, "Upgrade Your Ride" headline, t-shirt placeholder products.
 
 A homepage design spec exists as an HTML preview artifact (deep pine `#102A1C` / bone `#EDE8DC` / brass `#C2A05C`, Bodoni Moda display + Inter body). Sections: announcement bar → sticky header → hero → 4-stat trust strip → category grid → featured products → brand story band → 3-step delivery timeline → footer.
 
-Needs replacing: logo, hero image + headline, featured collection, nav menu, all placeholder content.
+Needs replacing (the Drive Fresh logo stays): hero image + headline, featured collection, nav menu, all placeholder content.
 
 **Theme file editing via API is blocked on live/published themes.** Either duplicate the theme first and edit the copy, use Shopify CLI (`shopify theme dev` / `shopify theme pull`) for local development, or do it in the theme customizer.
 

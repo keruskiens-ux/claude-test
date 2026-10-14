@@ -1,4 +1,4 @@
-{{ 'golf-empire.css' | asset_url | stylesheet_tag }}
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -16,15 +16,15 @@
 
 <div class="color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
-    <div class="ge-story{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
+    <div class="df-story{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
       {%- if section.settings.eyebrow != blank -%}
-        <p class="ge-eyebrow">{{ section.settings.eyebrow | escape }}</p>
+        <p class="df-eyebrow">{{ section.settings.eyebrow | escape }}</p>
       {%- endif -%}
       {%- if section.settings.heading != blank -%}
-        <h2 class="ge-story__heading h1">{{ section.settings.heading }}</h2>
+        <h2 class="df-story__heading h1">{{ section.settings.heading }}</h2>
       {%- endif -%}
       {%- if section.settings.text != blank -%}
-        <div class="ge-story__text rte">{{ section.settings.text }}</div>
+        <div class="df-story__text rte">{{ section.settings.text }}</div>
       {%- endif -%}
       {%- if section.settings.button_label != blank and section.settings.button_link != blank -%}
         <p>
@@ -33,14 +33,14 @@
           </a>
         </p>
       {%- endif -%}
-      <p class="ge-story__fineprint">Not affiliated with any golf equipment manufacturer.</p>
+      <p class="df-story__fineprint">Not affiliated with any golf equipment manufacturer.</p>
     </div>
   </div>
 </div>
 
 {% schema %}
 {
-  "name": "GE Brand story",
+  "name": "DF Brand story",
   "tag": "section",
   "class": "section",
   "disabled_on": {
@@ -55,7 +55,7 @@
       "type": "text",
       "id": "eyebrow",
       "label": "Eyebrow",
-      "default": "Why Golf Empire"
+      "default": "Why Drive Fresh"
     },
     {
       "type": "inline_richtext",
@@ -113,7 +113,7 @@
   ],
   "presets": [
     {
-      "name": "GE Brand story"
+      "name": "DF Brand story"
     }
   ]
 }

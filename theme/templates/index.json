@@ -9,10 +9,10 @@
  */
 {
   "sections": {
-    "ge_hero": {
-      "type": "ge-hero",
+    "df_hero": {
+      "type": "df-hero",
       "settings": {
-        "eyebrow": "Golf Empire",
+        "eyebrow": "Drive Fresh",
         "heading": "Pay for the club. Not the logo.",
         "heading_size": "h0",
         "text": "<p>Forged irons, carbon-composite drivers and milled wedges, sold without the brand-name markup. Tracked, insured delivery in 2–4 weeks.</p>",
@@ -25,8 +25,8 @@
         "padding_bottom": 64
       }
     },
-    "ge_trust": {
-      "type": "ge-trust-strip",
+    "df_trust": {
+      "type": "df-trust-strip",
       "blocks": {
         "stat_1": {
           "type": "stat",
@@ -69,7 +69,7 @@
         "padding_bottom": 40
       }
     },
-    "ge_categories": {
+    "df_categories": {
       "type": "collection-list",
       "blocks": {
         "col_1": {
@@ -151,10 +151,10 @@
         "padding_bottom": 72
       }
     },
-    "ge_story": {
-      "type": "ge-brand-story",
+    "df_story": {
+      "type": "df-brand-story",
       "settings": {
-        "eyebrow": "Why Golf Empire",
+        "eyebrow": "Why Drive Fresh",
         "heading": "You're paying for a logo, not a golf club.",
         "text": "<p>A big share of a name-brand club's price goes to tour sponsorships, ad campaigns and the badge on the back of the head. We skip all of it and sell well-made, unbranded clubs at a price that reflects the club.</p>",
         "button_label": "Read our story",
@@ -164,8 +164,8 @@
         "padding_bottom": 80
       }
     },
-    "ge_timeline": {
-      "type": "ge-delivery-timeline",
+    "df_timeline": {
+      "type": "df-delivery-timeline",
       "blocks": {
         "step_1": {
           "type": "step",
@@ -208,11 +208,11 @@
     }
   },
   "order": [
-    "ge_hero",
-    "ge_trust",
-    "ge_categories",
+    "df_hero",
+    "df_trust",
+    "df_categories",
     "featured_collection",
-    "ge_story",
-    "ge_timeline"
+    "df_story",
+    "df_timeline"
   ]
 }

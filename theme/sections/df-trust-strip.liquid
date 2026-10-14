@@ -1,4 +1,4 @@
-{{ 'golf-empire.css' | asset_url | stylesheet_tag }}
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -20,11 +20,11 @@
 {% endcomment %}
 <div class="color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
-    <ul class="ge-stats" role="list">
+    <ul class="df-stats" role="list">
       {%- for block in section.blocks -%}
-        <li class="ge-stats__item" {{ block.shopify_attributes }}>
-          <span class="ge-stats__value">{{ block.settings.value | escape }}</span>
-          <span class="ge-stats__label">{{ block.settings.label | escape }}</span>
+        <li class="df-stats__item" {{ block.shopify_attributes }}>
+          <span class="df-stats__value">{{ block.settings.value | escape }}</span>
+          <span class="df-stats__label">{{ block.settings.label | escape }}</span>
         </li>
       {%- endfor -%}
     </ul>
@@ -33,7 +33,7 @@
 
 {% schema %}
 {
-  "name": "GE Trust strip",
+  "name": "DF Trust strip",
   "tag": "section",
   "class": "section",
   "max_blocks": 4,
@@ -98,7 +98,7 @@
   ],
   "presets": [
     {
-      "name": "GE Trust strip",
+      "name": "DF Trust strip",
       "blocks": [
         { "type": "stat", "settings": { "value": "2–4 wks", "label": "Tracked delivery to your door" } },
         { "type": "stat", "settings": { "value": "100%", "label": "Covered if damaged, defective or incorrect" } },

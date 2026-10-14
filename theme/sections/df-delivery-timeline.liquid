@@ -1,4 +1,4 @@
-{{ 'golf-empire.css' | asset_url | stylesheet_tag }}
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -17,28 +17,28 @@
 <div class="color-{{ section.settings.color_scheme }} gradient">
   <div class="page-width section-{{ section.id }}-padding">
     {%- if section.settings.heading != blank -%}
-      <h2 class="ge-timeline__heading {{ section.settings.heading_size }}">{{ section.settings.heading }}</h2>
+      <h2 class="df-timeline__heading {{ section.settings.heading_size }}">{{ section.settings.heading }}</h2>
     {%- endif -%}
-    <ol class="ge-timeline" role="list">
+    <ol class="df-timeline" role="list">
       {%- for block in section.blocks -%}
-        <li class="ge-timeline__step" {{ block.shopify_attributes }}>
+        <li class="df-timeline__step" {{ block.shopify_attributes }}>
           {%- if block.settings.when != blank -%}
-            <p class="ge-timeline__when">{{ block.settings.when | escape }}</p>
+            <p class="df-timeline__when">{{ block.settings.when | escape }}</p>
           {%- endif -%}
-          <h3 class="ge-timeline__title h4">{{ block.settings.title | escape }}</h3>
-          <div class="ge-timeline__text rte">{{ block.settings.text }}</div>
+          <h3 class="df-timeline__title h4">{{ block.settings.title | escape }}</h3>
+          <div class="df-timeline__text rte">{{ block.settings.text }}</div>
         </li>
       {%- endfor -%}
     </ol>
     {%- if section.settings.note != blank -%}
-      <div class="ge-timeline__note rte">{{ section.settings.note }}</div>
+      <div class="df-timeline__note rte">{{ section.settings.note }}</div>
     {%- endif -%}
   </div>
 </div>
 
 {% schema %}
 {
-  "name": "GE Delivery timeline",
+  "name": "DF Delivery timeline",
   "tag": "section",
   "class": "section",
   "max_blocks": 4,
@@ -128,7 +128,7 @@
   ],
   "presets": [
     {
-      "name": "GE Delivery timeline",
+      "name": "DF Delivery timeline",
       "blocks": [
         { "type": "step" },
         { "type": "step" },
