@@ -18,6 +18,11 @@ All of `theme/` has been uploaded to an **unpublished** copy of the live theme n
 
 To review: **Online Store → Themes → Drive Fresh (staging) → Preview / Customize**. Publish it from there when happy.
 
+Leftover files to delete by hand (Themes → Drive Fresh (staging) → ⋯ → Edit code). They're from before the
+rename, nothing uses them, and the API connection can't delete theme files: `sections/ge-hero.liquid`,
+`sections/ge-trust-strip.liquid`, `sections/ge-brand-story.liquid`, `sections/ge-delivery-timeline.liquid`,
+`snippets/ge-final-sale-notice.liquid`, `assets/golf-empire.css`.
+
 What changed:
 
 - **Homepage** (`templates/index.json`): announcement bar → header → hero → 4-stat trust strip → category grid
