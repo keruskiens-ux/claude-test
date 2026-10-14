@@ -18,10 +18,10 @@ All of `theme/` has been uploaded to an **unpublished** copy of the live theme n
 
 To review: **Online Store → Themes → Drive Fresh (staging) → Preview / Customize**. Publish it from there when happy.
 
-Leftover files to delete by hand (Themes → Drive Fresh (staging) → ⋯ → Edit code). They're from before the
-rename, nothing uses them, and the API connection can't delete theme files: `sections/ge-hero.liquid`,
-`sections/ge-trust-strip.liquid`, `sections/ge-brand-story.liquid`, `sections/ge-delivery-timeline.liquid`,
-`snippets/ge-final-sale-notice.liquid`, `assets/golf-empire.css`.
+Six pre-rename files (`sections/ge-*.liquid`, `snippets/ge-final-sale-notice.liquid`, `assets/golf-empire.css`)
+still exist in the staging theme because the API connection can't delete theme files. They've been overwritten
+with empty stubs labelled "Unused (delete me)" and have no presets, so they don't appear in the theme editor.
+Deleting them in Edit code is optional tidying.
 
 What changed:
 
@@ -45,9 +45,8 @@ What changed:
 Before publishing, check in the theme editor:
 1. **Theme settings → Typography** shows Bodoni Moda / Inter. (I couldn't render the storefront from my environment
    to confirm the font handles.)
-2. The Drive Fresh logo was made for the old dark-navy header; the header is now bone (`#EDE8DC`). If the logo is
-   white or light it will disappear. Either upload a dark version or set the header to the pine colour scheme
-   (Header section → Color scheme → scheme 3).
+2. The header and announcement bar use the dark pine scheme, so the Drive Fresh logo (made for the old dark
+   header) stays legible. Glance at it in the preview anyway.
 3. Hero image: DF Hero section → Image. Until then it shows a pine "DF" monogram panel, not a fake photo.
 4. Collection tiles use each collection's own image — set those under Products → Collections (900×1200).
 5. Main menu still reads Home / Catalog / About Us — add the five collections in **Online Store → Navigation**.
