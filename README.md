@@ -51,7 +51,8 @@ checkbox needs Shopify Plus or a terms-checkbox app; this is the free version th
 All three products from `products/golf-empire-products.csv` were created on 2026-10-14 through the Admin API, status
 **Draft** (not buyable, not on any sales channel). Vendor *Golf Empire*, the tags the smart collections match on, the
 required opening disclosure and closing "Not affiliated…" line, all 9 SKUs, no compare-at prices, inventory not
-tracked. The CSV remains the source of truth if they ever need re-importing.
+tracked. Each one shows up in its smart collection (irons → `golf-irons`, driver → `drivers-woods`, wedges →
+`putters-wedges`) while still a draft. The CSV remains the source of truth if they ever need re-importing.
 
 The descriptions contain **only** what the handoff states (piece count, lofts, flex options). Head material,
 shaft weight, bounce, hosel adjustability range, swing weights, handedness etc. are **deliberately missing** — add
