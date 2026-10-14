@@ -12,11 +12,11 @@
     "df_tiles": {
       "type": "df-category-grid",
       "blocks": {
-        "tile_all": {
+        "tile_sets": {
           "type": "tile",
           "settings": {
-            "label": "Shop All Clubs",
-            "link": "shopify://collections/all"
+            "label": "Complete Sets",
+            "collection": "complete-sets-starter-kits"
           }
         },
         "tile_irons": {
@@ -29,15 +29,8 @@
         "tile_drivers": {
           "type": "tile",
           "settings": {
-            "label": "Drivers",
+            "label": "Drivers & Woods",
             "collection": "drivers-woods"
-          }
-        },
-        "tile_fairway": {
-          "type": "tile",
-          "settings": {
-            "label": "Fairway & Hybrids",
-            "collection": "fairway-woods-hybrids"
           }
         },
         "tile_wedges": {
@@ -53,21 +46,52 @@
             "label": "Bags & Accessories",
             "collection": "bags-accessories"
           }
+        },
+        "tile_essentials": {
+          "type": "tile",
+          "settings": {
+            "label": "Course Essentials",
+            "collection": "course-essentials"
+          }
+        },
+        "tile_training": {
+          "type": "tile",
+          "settings": {
+            "label": "Training & Practice",
+            "collection": "training-practice"
+          }
+        },
+        "tile_apparel": {
+          "type": "tile",
+          "settings": {
+            "label": "Apparel, Shoes & Sun Gear",
+            "collection": "apparel-shoes-sun-gear"
+          }
+        },
+        "tile_tech": {
+          "type": "tile",
+          "settings": {
+            "label": "Rangefinders & Tech",
+            "collection": "rangefinders-tech"
+          }
         }
       },
       "block_order": [
-        "tile_all",
+        "tile_sets",
         "tile_irons",
         "tile_drivers",
-        "tile_fairway",
         "tile_wedges",
-        "tile_bags"
+        "tile_bags",
+        "tile_essentials",
+        "tile_training",
+        "tile_apparel",
+        "tile_tech"
       ],
       "settings": {
-        "heading": "",
+        "heading": "Shop by category",
         "heading_size": "h1",
         "columns_desktop": 3,
-        "color_scheme": "scheme-3",
+        "color_scheme": "scheme-2",
         "padding_top": 32,
         "padding_bottom": 48
       }
@@ -76,11 +100,11 @@
       "type": "df-hero",
       "settings": {
         "eyebrow": "Drive Fresh",
-        "heading": "Pay for the club. Not the logo.",
+        "heading": "Golf gear for every round.",
         "heading_size": "h0",
-        "text": "<p>Forged irons, carbon-composite drivers and milled wedges, sold without the brand-name markup. Tracked, insured delivery in 2–4 weeks.</p>",
-        "button_label_1": "Shop irons",
-        "button_link_1": "shopify://collections/golf-irons",
+        "text": "<p>Clubs, bags, training aids and course essentials at fair prices. Tracked delivery, typically 2–6 weeks depending on the item.</p>",
+        "button_label_1": "Shop sets",
+        "button_link_1": "shopify://collections/complete-sets-starter-kits",
         "button_label_2": "Our story",
         "button_link_2": "shopify://pages/about-us",
         "color_scheme": "scheme-1",
@@ -95,8 +119,8 @@
         "stat_1": {
           "type": "stat",
           "settings": {
-            "value": "2-4 wks",
-            "label": "Tracked, insured delivery"
+            "value": "2-6 wks",
+            "label": "Tracked delivery, depending on the item"
           }
         },
         "stat_2": {
@@ -116,8 +140,8 @@
         "stat_4": {
           "type": "stat",
           "settings": {
-            "value": "$0",
-            "label": "Spent on tour logos"
+            "value": "US",
+            "label": "Shipping to all 50 states"
           }
         }
       },
@@ -128,7 +152,7 @@
         "stat_4"
       ],
       "settings": {
-        "color_scheme": "scheme-2",
+        "color_scheme": "scheme-1",
         "padding_top": 40,
         "padding_bottom": 40
       }
@@ -138,7 +162,7 @@
       "settings": {
         "collection": "all",
         "products_to_show": 4,
-        "title": "Featured clubs",
+        "title": "Best sellers",
         "heading_size": "h1",
         "description": "",
         "show_description": false,
@@ -165,9 +189,9 @@
     "df_story": {
       "type": "df-brand-story",
       "settings": {
-        "eyebrow": "Why Drive Fresh",
-        "heading": "You're paying for a logo, not a golf club.",
-        "text": "<p>A big share of a name-brand club's price goes to tour sponsorships, ad campaigns and the badge on the back of the head. We skip all of it and sell well-made, unbranded clubs at a price that reflects the club.</p>",
+        "eyebrow": "About Drive Fresh",
+        "heading": "Good golf gear, priced fair.",
+        "text": "<p>Golf gets expensive fast. We source quality clubs, bags and accessories straight from manufacturers so you can fill your bag without paying for expensive marketing and brand names.</p>",
         "button_label": "Read our story",
         "button_link": "shopify://pages/about-us",
         "color_scheme": "scheme-3",
@@ -197,9 +221,9 @@
         "step_3": {
           "type": "step",
           "settings": {
-            "when": "2–4 weeks",
-            "title": "Delivered, insured",
-            "text": "<p>12–21 days in transit. Inspect on arrival — report any damage within 7 days and we replace or refund it.</p>"
+            "when": "2–6 weeks",
+            "title": "Delivered",
+            "text": "<p>Most items arrive in 10–35 days after dispatch depending on the product and supplier. Inspect on arrival — report any damage within 7 days and we replace or refund it.</p>"
           }
         }
       },
@@ -211,7 +235,7 @@
       "settings": {
         "heading": "What happens after you order",
         "heading_size": "h1",
-        "note": "<p>If we can't dispatch your order within 7 business days, we'll email you a new date and you can cancel for a full refund. Full details in our <a href=\"/pages/return-policy\" title=\"Return policy\">return policy</a>.</p>",
+        "note": "<p>If we can't dispatch your order within 7 business days, we'll email you a new date and you can cancel for a full refund. Full details in our <a href=\"/policies/refund-policy\" title=\"Refund policy\">refund policy</a>.</p>",
         "color_scheme": "scheme-2",
         "padding_top": 72,
         "padding_bottom": 72
