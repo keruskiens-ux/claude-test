@@ -1,0 +1,143 @@
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" defer="defer"></script>
+<script src="{{ 'df-3d-hero.js' | asset_url }}" defer="defer"></script>
+
+{% comment %}
+  Scroll-driven 3D intro: a golf ball launches off a tee as the visitor scrolls.
+  The section is tall; its inner panel sticks to the viewport while the scroll
+  distance drives the animation and the three text beats.
+{% endcomment %}
+<df-3d-hero class="df3d" style="--df3d-length: {{ section.settings.scroll_length }}vh;">
+  {%- unless request.design_mode or section.settings.show_intro == false -%}
+    {%- comment -%}
+      Short branded intro that covers the 3D scene while it loads. Shown once per
+      browser session; CSS removes it after 2.4s even if scripts never run.
+    {%- endcomment -%}
+    <div class="df3d__loader" aria-hidden="true">
+      <div class="df3d__loader-inner">
+        <span class="df3d__loader-word">
+          {%- assign intro_letters = section.settings.eyebrow | default: shop.name | split: '' -%}
+          {%- for letter in intro_letters -%}
+            <span style="--i: {{ forloop.index0 }};">{% if letter == ' ' %}&nbsp;{% else %}{{ letter | escape }}{% endif %}</span>
+          {%- endfor -%}
+        </span>
+        <span class="df3d__loader-green">
+          <span class="df3d__loader-ball"></span>
+          <span class="df3d__loader-cup"></span>
+        </span>
+      </div>
+    </div>
+    <script>
+      try {
+        if (sessionStorage.getItem('df-intro')) document.currentScript.previousElementSibling.remove();
+      } catch (e) {}
+    </script>
+  {%- endunless -%}
+  <div class="df3d__sticky">
+    <canvas class="df3d__canvas" aria-hidden="true"></canvas>
+
+    <div class="df3d__copy">
+      <div class="df3d__beat" data-df-from="0" data-df-to="0.34">
+        {%- if section.settings.eyebrow != blank -%}
+          <p class="df3d__eyebrow">{{ section.settings.eyebrow | escape }}</p>
+        {%- endif -%}
+        <h1 class="df3d__title">{{ section.settings.heading_1 }}</h1>
+      </div>
+      <div class="df3d__beat" data-df-from="0.34" data-df-to="0.68">
+        <h2 class="df3d__title">{{ section.settings.heading_2 }}</h2>
+      </div>
+      <div class="df3d__beat" data-df-from="0.68" data-df-to="1">
+        <h2 class="df3d__title">{{ section.settings.heading_3 }}</h2>
+        {%- if section.settings.button_label != blank -%}
+          <a
+            href="{{ section.settings.button_link | default: routes.all_products_collection_url }}"
+            class="df3d__cta"
+          >
+            {{- section.settings.button_label | escape -}}
+            <span aria-hidden="true">→</span>
+          </a>
+        {%- endif -%}
+      </div>
+    </div>
+
+    <div class="df3d__hint" aria-hidden="true">
+      <span>Scroll</span>
+      <span class="df3d__hint-line"></span>
+    </div>
+  </div>
+</df-3d-hero>
+
+{% schema %}
+{
+  "name": "DF 3D drive intro",
+  "tag": "section",
+  "class": "section df3d-section",
+  "disabled_on": {
+    "groups": ["header", "footer"]
+  },
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Full-screen 3D intro. Scrolling launches the ball and moves through the three headlines. Copy rules: no logo jokes; say products, not clubs."
+    },
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow",
+      "default": "Drive Fresh"
+    },
+    {
+      "type": "inline_richtext",
+      "id": "heading_1",
+      "label": "Headline 1 (on the tee)",
+      "default": "Golf gear for every round."
+    },
+    {
+      "type": "inline_richtext",
+      "id": "heading_2",
+      "label": "Headline 2 (mid-flight)",
+      "default": "Clubs, bags, training aids and more."
+    },
+    {
+      "type": "inline_richtext",
+      "id": "heading_3",
+      "label": "Headline 3 (in the sky)",
+      "default": "Fair prices. Tracked delivery."
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Shop all products"
+    },
+    {
+      "type": "url",
+      "id": "button_link",
+      "label": "Button link"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_intro",
+      "label": "Show loading intro",
+      "info": "A one-second branded intro while the 3D scene loads. Shown once per visit, never in the theme editor.",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "scroll_length",
+      "min": 150,
+      "max": 400,
+      "step": 25,
+      "unit": "vh",
+      "label": "Scroll length",
+      "info": "How far visitors scroll to finish the animation. Longer feels slower.",
+      "default": 250
+    }
+  ],
+  "presets": [
+    {
+      "name": "DF 3D drive intro"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,26 @@
+{% comment %}
+  Conspicuous final-sale + delivery-window disclosure.
+  Several states default to a return right unless a no-return policy is
+  conspicuously disclosed, so this sits next to every buy and checkout button.
+  Wording must match /pages/return-policy and /pages/shipping-policy.
+
+  Accepts:
+  - context: {String} 'product' or 'cart' (optional, styling only)
+
+  Usage:
+  {% render 'df-final-sale-notice', context: 'product' %}
+{% endcomment %}
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+<div class="df-final-sale df-final-sale--{{ context | default: 'product' }}" role="note">
+  <p class="df-final-sale__line">
+    <strong>All sales final. Damaged, defective, or incorrect items fully covered.</strong>
+  </p>
+  <p class="df-final-sale__line">
+    <strong>Estimated delivery: 2–4 weeks.</strong> Ships from our international fulfillment partner.
+  </p>
+  <p class="df-final-sale__links">
+    <a href="/pages/return-policy" class="link underlined-link">Return policy</a>
+    <span aria-hidden="true">·</span>
+    <a href="/pages/shipping-policy" class="link underlined-link">Shipping policy</a>
+  </p>
+</div>

@@ -1,0 +1,92 @@
+{{ 'drive-fresh.css' | asset_url | stylesheet_tag }}
+
+{% comment %}
+  Oversized scrolling type band. Text repeats so the loop is seamless; the
+  speed and direction follow the visitor's scroll (assets/df-motion.js).
+  Keep each line literally true (shipping, delivery, pricing claims).
+{% endcomment %}
+{%- capture df_marquee_run -%}
+  {%- for block in section.blocks -%}
+    {%- assign df_odd = forloop.index0 | modulo: 2 -%}
+    <span class="df-marquee__item{% if section.settings.outline and df_odd == 1 %} df-marquee__item--outline{% endif %}">
+      {{- block.settings.text | escape -}}
+    </span>
+    <span class="df-marquee__ball" aria-hidden="true"></span>
+  {%- endfor -%}
+{%- endcapture -%}
+
+<div class="df-marquee color-{{ section.settings.color_scheme }} gradient" style="--df-marquee-speed: {{ section.settings.speed }}s;">
+  <p class="visually-hidden">
+    {%- for block in section.blocks -%}{{ block.settings.text | escape }}{% unless forloop.last %}. {% endunless %}{%- endfor -%}
+  </p>
+  <div class="df-marquee__viewport" aria-hidden="true">
+    <div class="df-marquee__track">
+      <div class="df-marquee__run">{{ df_marquee_run }}</div>
+      <div class="df-marquee__run">{{ df_marquee_run }}</div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ 'df-motion.js' | asset_url }}" defer="defer"></script>
+
+{% schema %}
+{
+  "name": "DF Scrolling type",
+  "tag": "section",
+  "class": "section",
+  "max_blocks": 6,
+  "disabled_on": {
+    "groups": ["header", "footer"]
+  },
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "outline",
+      "label": "Outline every other line",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "speed",
+      "min": 20,
+      "max": 80,
+      "step": 5,
+      "unit": "s",
+      "label": "Loop time",
+      "info": "Seconds for one full loop. Lower is faster.",
+      "default": 40
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:sections.all.colors.label",
+      "default": "scheme-5"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "line",
+      "name": "Line",
+      "settings": [
+        {
+          "type": "text",
+          "id": "text",
+          "label": "Text",
+          "default": "Golf gear for every round"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "DF Scrolling type",
+      "blocks": [
+        { "type": "line", "settings": { "text": "Golf gear for every round" } },
+        { "type": "line", "settings": { "text": "Free shipping over $75" } },
+        { "type": "line", "settings": { "text": "Tracked delivery" } },
+        { "type": "line", "settings": { "text": "Fair prices" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

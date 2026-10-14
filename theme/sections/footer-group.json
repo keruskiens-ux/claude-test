@@ -1,0 +1,63 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin theme editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
+{
+  "name": "t:sections.footer.name",
+  "type": "footer",
+  "sections": {
+    "footer": {
+      "type": "footer",
+      "settings": {
+        "color_scheme": "scheme-1",
+        "newsletter_enable": true,
+        "newsletter_heading": "Get shipping updates & new arrivals",
+        "enable_follow_on_shop": true,
+        "show_social": true,
+        "enable_country_selector": false,
+        "enable_language_selector": false,
+        "payment_enable": true,
+        "show_policy": true,
+        "margin_top": 0,
+        "padding_top": 36,
+        "padding_bottom": 36
+      },
+      "blocks": {
+        "brand": {
+          "type": "text",
+          "settings": {
+            "heading": "Drive Fresh",
+            "subtext": "<p>Unbranded golf equipment at honest prices. Questions before you buy? Email <a href=\"mailto:solodrivenate@gmail.com\" title=\"Email Drive Fresh\">solodrivenate@gmail.com</a> — we reply within 24 hours.</p><p>Not affiliated with any golf equipment manufacturer.</p>"
+          }
+        },
+        "shop": {
+          "type": "link_list",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer"
+          }
+        }
+      },
+      "block_order": [
+        "brand",
+        "shop"
+      ]
+    },
+    "df_float": {
+      "type": "df-floating-contact",
+      "settings": {
+        "whatsapp": "",
+        "email": "solodrivenate@gmail.com"
+      }
+    }
+  },
+  "order": [
+    "footer",
+    "df_float"
+  ]
+}
