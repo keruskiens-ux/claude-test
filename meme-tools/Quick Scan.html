@@ -51,7 +51,7 @@ const L={
  'Freeze authority ON':'The dev can freeze your wallet so you can buy but never sell (a honeypot). Safe coins have it revoked.',
  'LP not locked':'Liquidity isn\'t locked/burned, so the dev can pull the pool and leave you holding a worthless coin. Look for 80-100%.',
  'Top 10 hold too much':'A few wallets own a big chunk of supply. If they sell together, price dumps hard. Aim for top 10 under ~25%.',
- 'Insider networks':'Groups of linked wallets funded from the same source — often one team posing as many buyers (a bundled launch). They dump on later buyers. Confirm on Bubblemaps: starburst clusters = bad.',
+ 'Copycat / vamp':'Another, bigger and older coin uses the same ticker or name. Copycats ("vamps") catch people who search the ticker instead of copying the real CA.','Insider networks':'Groups of linked wallets funded from the same source — often one team posing as many buyers (a bundled launch). They dump on later buyers. Confirm on Bubblemaps: starburst clusters = bad.',
  'Transfer tax':'Every buy/sell pays a % fee to a wallet the dev controls. It eats your profit and the dev can raise it.',
  'Mutable metadata':'The dev can still change the coin\'s name/image/links. Often used to rebrand into a scam or impersonate another coin.',
  'Dev still holding':'The creator still has a bag and can dump it on you. Lower is safer.',
@@ -65,7 +65,7 @@ function summary(d){const r=[...new Set(d.reasons)],two=r.slice(0,2).join(' and 
  if(d.v==='AVOID')return 'Danger: '+two+' — likely fake or a rug. Don\'t trade it.';
  const t=d.en==='LATE'?' It already pumped hard — don\'t chase.':d.en==='FALLING'?' Price is falling right now — wait.':'';
  if(d.v==='RISKY')return 'Caution: '+two+'.'+t+(t?'':' Small size only, check Bubblemaps first.');
- return 'Looks clean on paper: no red flags from RugCheck, DexScreener or the wallet check.'+(t||' Still check Bubblemaps before buying.')}
+ return 'Looks clean on paper: no red flags from RugCheck, DexScreener or the wallet check.'+(t||' Still check Bubblemaps before buying.')+(d.info?' Note: '+d.info+'.':'')}
 const PAIR={},HOLD={},HIST='qs_history';
 const EXP={'Liquidity':'Money in the trading pool. Low = you may not be able to sell without crashing the price.','Liq / MC':'Liquidity as % of market cap. Under ~5% is thin; healthy coins are often 8%+.','Volume 24h':'Total traded in 24h. Can be faked by bots — compare with fees and holders.','Holders':'Wallets holding the coin. Way too many holders for a small market cap = fake wallets.','Top 10':'% of supply held by the 10 biggest wallets. Under 25% is safer.','LP Locked':'% of liquidity locked/burned so the dev can\'t pull it. Want 80-100%.','Insider nets':'Groups of linked wallets (same funder). High = bundled launch, they dump on you.','Dev holds':'% the creator still holds. Over 5% = dump risk.','Mint auth':'If ON, dev can print new tokens. Want Revoked.','Freeze auth':'If ON, dev can freeze your wallet so you can\'t sell. Want Revoked.','Tax':'Fee on every buy/sell going to the dev. Want 0%.','Metadata':'If Mutable, dev can change name/image/links later.','Avg trade':'Volume ÷ number of trades. Tons of tiny trades = bots faking volume.','Holders / $1K MC':'Real coins rarely have more than ~50 holders per $1K of market cap. Way more = farmed fake wallets.'};
 const risk=(name,hard,extra)=>`<span class="risk ${hard?'hard':''}" data-t="${esc(name)}" data-x="${esc(extra||L[name]||'Flag from RugCheck. Open RC for details.')}">${hard?'⛔':'⚠️'} ${esc(name)}</span>`;
@@ -98,7 +98,16 @@ async function one(m){
   if(cb>5)add('Dev still holding',0,'Creator holds '+cb.toFixed(1)+'%. '+L['Dev still holding']);
   (rc.risks||[]).filter(x=>x.level==='danger'&&!/LP|Mint|Freeze|holder|Top 10|insider|liquidity/i.test(x.name)).forEach(x=>add(x.name,0,x.description));
  } else add('RugCheck unavailable',0,'Couldn\'t load RugCheck (rate limit or new coin). Open RC manually.');
-const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p.volume||{}).h24||0,avgTr=nTx?vol/nTx:0,hpk=holders&&mc?holders/(mc/1000):0;
+// ---- vamp / copycat check: same ticker or name on another Solana coin ----
+ let vampNote='';if(p){const sym=(p.baseToken.symbol||'').replace(/^\$/,'').toLowerCase(),nm=(p.baseToken.name||'').toLowerCase();
+  const sr=await f('https://api.dexscreener.com/latest/dex/search?q='+encodeURIComponent(sym));const by={};
+  for(const x of ((sr&&sr.pairs)||[])){if(x.chainId!=='solana'||!x.baseToken||x.baseToken.address===m)continue;const s2=(x.baseToken.symbol||'').replace(/^\$/,'').toLowerCase(),n2=(x.baseToken.name||'').toLowerCase();if(s2!==sym&&n2!==nm)continue;
+   const a=x.baseToken.address,o=by[a]||(by[a]={a,mc:0,liq:0,born:Infinity});o.mc=Math.max(o.mc,x.marketCap||x.fdv||0);o.liq+=((x.liquidity||{}).usd||0);o.born=Math.min(o.born,x.pairCreatedAt||Infinity)}
+  const others=Object.values(by).filter(o=>o.liq>=1000),myBorn=p.pairCreatedAt||Date.now(),orig=others.filter(o=>o.mc>mc*3&&o.born<myBorn).sort((a,b)=>b.mc-a.mc)[0];
+  if(orig){const ageD=(Date.now()-orig.born)/864e5,classic=(Date.now()-myBorn)/36e5<72&&orig.mc>mc*10;
+   add('Copycat / vamp',classic,'Another coin called $'+p.baseToken.symbol+' is bigger and older: CA '+orig.a.slice(0,4)+'…'+orig.a.slice(-4)+', market cap $'+k(orig.mc)+', '+(ageD<2?Math.round(ageD*24)+'h':Math.round(ageD)+'d')+' old ('+others.length+' coin'+(others.length>1?'s':'')+' share this ticker). A "vamp" copies a popular coin\'s name to catch people who search the ticker. Make sure you have the CA from the original\'s own X/site.');vampNote='a bigger, older $'+p.baseToken.symbol+' exists (CA '+orig.a.slice(0,4)+'…'+orig.a.slice(-4)+', $'+k(orig.mc)+') — this looks like a copy'}
+  else if(others.length)vampNote=others.length+' copycat coin'+(others.length>1?'s':'')+' use this ticker — this one is the biggest/oldest'}
+ const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p.volume||{}).h24||0,avgTr=nTx?vol/nTx:0,hpk=holders&&mc?holders/(mc/1000):0;
  if(!OLD&&hpk>50)add('Fake wallets',1,holders+' holders on only $'+k(mc)+' market cap ('+hpk.toFixed(0)+' per $1K). Real coins don\'t get that many holders that cheap — wallets were farmed to look popular (like BITCAT).');
  if(!OLD&&AGE<24*7&&nTx>3000&&avgTr<35)add('Botted volume',0,'Average trade is only $'+avgTr.toFixed(0)+' across '+k(nTx)+' trades. Bots make tons of tiny buys to fake volume. Check if fees match the market cap.');
 
@@ -121,9 +130,9 @@ const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p
  // plain-English summary (rule-based, no AI): biggest risk first
  const RW={'No market':'no trading pool exists','Already rugged':'RugCheck says it already rugged','Mint authority ON':'the dev can still mint new tokens','Freeze authority ON':'the dev can freeze your wallet','No real liquidity':'almost no liquidity ($'+k(liq)+') behind a $'+k(mc)+' market cap',
   'Top 10 hold too much':'the top 10 wallets hold '+(top10||0).toFixed(0)+'%','Fake wallets':'holders look farmed ('+Math.round(hpk)+' per $1K of market cap)','Insider networks':(ins||0)+' insider wallet networks','Transfer tax':tax+'% transfer tax','Botted volume':'volume looks botted (avg trade $'+avgTr.toFixed(0)+')',
-  'Low liquidity':'liquidity is thin ($'+k(liq)+')','LP not locked':'only '+(lp||0).toFixed(0)+'% of liquidity is locked','Single big holder':'one wallet holds '+single.toFixed(0)+'%','Dev still holding':'the dev still holds '+(cb||0).toFixed(1)+'%','Mutable metadata':'the dev can still change the name/image','Brand new (<2h)':'it is under 2 hours old','Deep check incomplete':'the deep check could not finish (re-scan it)'};
+  'Low liquidity':'liquidity is thin ($'+k(liq)+')','LP not locked':'only '+(lp||0).toFixed(0)+'% of liquidity is locked','Single big holder':'one wallet holds '+single.toFixed(0)+'%','Dev still holding':'the dev still holds '+(cb||0).toFixed(1)+'%','Mutable metadata':'the dev can still change the name/image','Brand new (<2h)':'it is under 2 hours old','Copycat / vamp':vampNote||'it may be a copycat','Deep check incomplete':'the deep check could not finish (re-scan it)'};
  const reasons=[...names.filter(n=>n.startsWith('⛔')),...names.filter(n=>!n.startsWith('⛔'))].map(n=>n.replace(/^(⛔|⚠️) /,'')).map(n=>RW[n]||n.toLowerCase());
- SUMD[m]={v,en,reasons};const sumTxt=summary(SUMD[m]);
+ SUMD[m]={v,en,reasons,info:(!names.some(n=>/Copycat/.test(n))&&vampNote)?vampNote:''};const sumTxt=summary(SUMD[m]);
  try{localStorage.setItem('qs_card_'+m,JSON.stringify({t:Date.now(),rug:v==='PASS'?'NOT A RUG':v==='RISKY'?'RISKY':'RUG RISK',entry:EN[en][0].replace(/^\S+ /,''),flags:names.join(' | ')||'none',tips:'pending',wallet:'pending'}))}catch(e){}
  const rugWhy=names.length?names.join(' · '):'No red flags from RugCheck/DexScreener. Wallet check and Bubblemaps still matter.';
  try{const hst=JSON.parse(localStorage.getItem(HIST)||'[]');hst.unshift({t:Date.now(),ca:m,sym:p?p.baseToken.symbol:'?',mc:Math.round(mc),liq:Math.round(liq),holders,top10,ins,rug:v,entry:en,flags:names.join(' | ')});localStorage.setItem(HIST,JSON.stringify(hst.slice(0,2000)))}catch(e){}
