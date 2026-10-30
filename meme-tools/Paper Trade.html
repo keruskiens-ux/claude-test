@@ -134,7 +134,7 @@ function drawPane(){const el=$('#pane');
   $('#csv').onclick=e=>{e.preventDefault();const c='time,token,ca,side,sol,tokens,mc\n'+st.hist.map(h=>[new Date(h.t).toISOString(),h.sym,h.ca,h.side,h.sol,h.tok,h.mc].join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='paper_trades.csv';a.click()}}
  if(tab==='hold'){if(!rc){el.innerHTML='<div class="muted">Loading holders…</div>';return}
   el.innerHTML='<table><tr><th>#</th><th>Wallet</th><th>% Supply</th><th>Insider?</th></tr>'+(rc.topHolders||[]).slice(0,20).map((h,i)=>`<tr><td>${i+1}</td><td><a target=_blank href="https://solscan.io/account/${h.owner||h.address}">${(h.owner||h.address||'').slice(0,4)}…${(h.owner||h.address||'').slice(-4)}</a></td><td>${(h.pct||0).toFixed(2)}%</td><td>${h.insider?'<span class="dn">yes</span>':''}</td></tr>`).join('')+'</table>'}
- if(tab==='about'){const i=(pair&&pair.info)||{},sym=pair?pair.baseToken.symbol:'';el.innerHTML='<div style="padding:8px;line-height:1.7"><b>'+(pair?pair.baseToken.name:'')+' ($'+sym+')</b><br>Age: '+(pair&&pair.pairCreatedAt?Math.round((Date.now()-pair.pairCreatedAt)/36e5)+'h':'-')+'<br>'+((i.websites||[]).map(w=>'<a target=_blank href="'+w.url+'">🌐 Website</a>').join(' ')||'No website')+' '+((i.socials||[]).map(x=>'<a target=_blank href="'+x.url+'">'+x.type+'</a>').join(' '))+'<br><b>Narrative:</b> <a target=_blank href="https://x.com/search?q=%24'+sym+'&f=live">Search $'+sym+' on X (live)</a> · <a target=_blank href="https://x.com/search?q='+ca+'&f=live">Search CA on X</a><br><span class="muted">Ask: what is this coin about, is the story real/current, who is posting it?</span></div>';return}
+ if(tab==='about'){const i=(pair&&pair.info)||{},sym=pair?pair.baseToken.symbol.replace(/^\$/,''):'';el.innerHTML='<div style="padding:8px;line-height:1.7"><b>'+(pair?pair.baseToken.name:'')+' ($'+sym+')</b><br>Age: '+(pair&&pair.pairCreatedAt?(h=>h<48?Math.round(h)+'h':Math.round(h/24)+'d')((Date.now()-pair.pairCreatedAt)/36e5):'-')+'<br>'+((i.websites||[]).map(w=>'<a target=_blank href="'+w.url+'">🌐 Website</a>').join(' ')||'No website')+' '+((i.socials||[]).map(x=>'<a target=_blank href="'+x.url+'">'+x.type+'</a>').join(' '))+'<br><b>Narrative:</b> <a target=_blank href="https://x.com/search?q=%24'+sym+'&f=live">Search $'+sym+' on X (live)</a> · <a target=_blank href="https://x.com/search?q='+ca+'&f=live">Search CA on X</a><br><span class="muted">Ask: what is this coin about, is the story real/current, who is posting it?</span></div>';return}
  if(tab==='live')return drawLive(el);
  if(tab==='cal')return drawCal(el);
  if(tab==='port'){const tot=st.hist.length, buys=st.hist.filter(h=>h.side==='BUY').reduce((s,h)=>s+h.sol,0), sells=st.hist.filter(h=>h.side==='SELL').reduce((s,h)=>s+h.sol,0);
@@ -162,16 +162,20 @@ async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST
  if(r.error){$('#feedSt').innerHTML='<span class="dn">tx error: '+r.error.message+'</span>';return}const tx=r.result;if(!tx)return;const signer=tx.transaction.message.accountKeys[0].pubkey||tx.transaction.message.accountKeys[0];
  const bal=a=>(a||[]).filter(b=>b.mint===ca&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
  const dTok=bal(tx.meta.postTokenBalances)-bal(tx.meta.preTokenBalances);if(!dTok)return;
- const dSol=Math.abs((tx.meta.postBalances[0]-tx.meta.preBalances[0])/1e9);
- if(dSol>0.05){priceSol=dSol/Math.abs(dTok);draw()}
- trades.unshift({t:(tx.blockTime||Date.now()/1000)*1000,side:dTok>0?'BUY':'SELL',tok:Math.abs(dTok),sol:dSol,w:signer,sig});if(trades.length>100)trades.pop();
+ // SOL side = plain SOL change + wrapped-SOL (WSOL) token change of the trader. Before: only plain SOL, so most trades showed ~fee only.
+ const WS='So11111111111111111111111111111111111111112',wb=a=>(a||[]).filter(b=>b.mint===WS&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
+ let dSol=Math.abs((tx.meta.postBalances[0]-tx.meta.preBalances[0]+tx.meta.fee)/1e9+(wb(tx.meta.postTokenBalances)-wb(tx.meta.preTokenBalances)));
+ const est=Math.abs(dTok)*priceSol;let approx=false;
+ // routed/ stock-paired trades: if parsed SOL is way off the live price, show the price-based estimate (marked ~)
+ if(est&&(dSol<est*0.5||dSol>est*2)){dSol=est;approx=true}
+ trades.unshift({t:(tx.blockTime||Date.now()/1000)*1000,side:dTok>0?'BUY':'SELL',tok:Math.abs(dTok),sol:dSol,approx,w:signer,sig});if(trades.length>100)trades.pop();
  if(tab==='live')drawPane()}catch(e){}}
 $('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
 $('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
  try{localStorage.setItem(HK,v)}catch(e){};fails=0;clearInterval(polling);polling=null;startFeed();toast(v?'Helius key saved':'Using public network')};
 function drawLive(el){const c={};trades.slice(0,40).forEach(x=>c[x.w]=(c[x.w]||0)+1);const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];
  const warn=trades.length>=15&&top&&top[1]/Math.min(trades.length,40)>=.3?'<div style="padding:6px;color:#ff4d6a;font-weight:700">⚠️ Wash trading? Wallet '+top[0].slice(0,4)+'…'+top[0].slice(-4)+' made '+top[1]+' of the last '+Math.min(trades.length,40)+' trades — fake volume.</div>':'';
- el.innerHTML=warn+'<table><tr><th>Age</th><th>Side</th><th>SOL</th><th>Tokens</th><th>Wallet</th></tr>'+(trades.length?trades.map(x=>{const a=Math.round((Date.now()-x.t)/1000);return `<tr><td>${a<60?a+'s':Math.round(a/60)+'m'}</td><td class="${x.side==='BUY'?'up':'dn'}">${x.side}</td><td>${x.sol.toFixed(3)}</td><td>${fmt(x.tok)}</td><td><a target=_blank href="https://solscan.io/tx/${x.sig}">${x.w.slice(0,4)}…${x.w.slice(-4)}</a></td></tr>`}).join(''):'<tr><td colspan=5 class="muted">Waiting for trades… (quiet coins may take a while)</td></tr>')+'</table>'}
+ el.innerHTML=warn+'<table><tr><th>Age</th><th>Side</th><th>SOL</th><th>Tokens</th><th>Wallet</th></tr>'+(trades.length?trades.map(x=>{const a=Math.round((Date.now()-x.t)/1000);return `<tr><td>${a<60?a+'s':Math.round(a/60)+'m'}</td><td class="${x.side==='BUY'?'up':'dn'}">${x.side}</td><td>${(x.approx?"~":"")+x.sol.toFixed(3)}</td><td>${fmt(x.tok)}</td><td><a target=_blank href="https://solscan.io/tx/${x.sig}">${x.w.slice(0,4)}…${x.w.slice(-4)}</a></td></tr>`}).join(''):'<tr><td colspan=5 class="muted">Waiting for trades… (quiet coins may take a while)</td></tr>')+'</table>'}
 setInterval(()=>{if(tab==='live')drawPane()},5000);
 
 let cm=new Date();cm.setDate(1);
