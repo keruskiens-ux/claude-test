@@ -38,7 +38,7 @@
 <div id="out"></div><div id="tip"></div>
 <script>
 const R={minLiq:20000,maxTop10:25,minLP:80,maxIns:3};
-const $=s=>document.querySelector(s),f=u=>fetch(u).then(r=>r.ok?r.json():null).catch(()=>null);
+const $=s=>document.querySelector(s),f=(u,t=0)=>fetch(u).then(r=>r.ok?r.json():(r.status===429&&t<2?new Promise(z=>setTimeout(z,2500*(t+1))).then(()=>f(u,t+1)):null)).catch(()=>t<1?new Promise(z=>setTimeout(z,2500)).then(()=>f(u,t+1)):null);
 const k=n=>n==null||isNaN(n)?'-':Math.abs(n)>=1e9?(n/1e9).toFixed(2)+'B':Math.abs(n)>=1e6?(n/1e6).toFixed(2)+'M':Math.abs(n)>=1e3?(n/1e3).toFixed(1)+'K':(+n).toFixed(0);
 const age=ms=>{const h=(Date.now()-ms)/36e5;return h<1?Math.round(h*60)+'m':h<48?Math.round(h)+'h':Math.round(h/24)+'d'};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -198,7 +198,7 @@ document.querySelectorAll('.pf').forEach(b=>b.onclick=async()=>{$('#out').innerH
  $('#in').value=r.map(c=>c.mint).join('\n');go()});
 document.querySelectorAll('.gk').forEach(b=>b.onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling from GeckoTerminal…</div>';
  const r=await f('https://api.geckoterminal.com/api/v2/networks/solana/'+b.dataset.u);const ms=[];
- for(const x of (r&&r.data)||[]){const id=((x.relationships||{}).base_token||{}).data;const a=id&&id.id.replace('solana_','');if(a&&!ms.includes(a)&&a!=='So11111111111111111111111111111111111111112')ms.push(a)}
+ for(const x of ((r&&r.data)||[]).filter(x=>b.dataset.u!=='new_pools'||!/pump/.test(((x.relationships||{}).dex||{}).data?.id||''))){const id=((x.relationships||{}).base_token||{}).data;const a=id&&id.id.replace('solana_','');if(a&&!ms.includes(a)&&a!=='So11111111111111111111111111111111111111112')ms.push(a)}
  if(!ms.length){$('#out').innerHTML='<div class="load">GeckoTerminal returned nothing. Try again in a minute.</div>';return}
  $('#in').value=ms.slice(0,20).join('\n');go()});
 $('#go').onclick=()=>go();$('#in').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.ctrlKey)go()});$('#in').addEventListener('paste',()=>setTimeout(async()=>{await go(true);$('#in').value='';$('#in').focus()},30));
