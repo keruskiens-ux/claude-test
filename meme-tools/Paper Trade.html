@@ -61,7 +61,9 @@ a{color:#8ab4ff}.lnk{font-size:12px}
 </main>
 <div id="toast"></div>
 <script>
-// ================= Paper Trade (session 9 rewrite) =================
+// ================= Paper Trade (session 9) =================
+// Price: live on-chain via ONE Helius websocket per window (pool account / vaults + trade logs). DexScreener = slow fallback + stats.
+// Wallet: shared localStorage 'papertrade_v1', re-read before every change, synced across windows via the 'storage' event.
 const $=s=>document.querySelector(s), ca=new URLSearchParams(location.search).get('ca');
 const K='papertrade_v1', START=10, FEE=0.01, SLIP=0.02, HK='papertrade_helius', WSM='So11111111111111111111111111111111111111112';
 const fmt=(n,d=2)=>n==null||isNaN(n)?'-':Math.abs(n)>=1e9?(n/1e9).toFixed(2)+'B':Math.abs(n)>=1e6?(n/1e6).toFixed(2)+'M':Math.abs(n)>=1e3?(n/1e3).toFixed(1)+'K':(+n).toFixed(d);
@@ -177,8 +179,10 @@ function trackHiLo(){const p=st.pos[ca];if(!p||!(p.tok>0)||!priceSol)return;if(p
  if(hlDirty&&Date.now()-(trackHiLo._t||0)>10000){trackHiLo._t=Date.now();hlDirty=0;const hi=p.hi,lo=p.lo;try{const s2=load();const q=s2.pos[ca];if(q&&q.tok>0){q.hi=Math.max(q.hi||0,hi);q.lo=Math.min(q.lo||lo,lo);localStorage.setItem(K,JSON.stringify(s2));st=s2}}catch(e){}}}
 
 // ---------- drawing (#4, #6): numbers every price tick via rAF; heavy panes only when needed ----------
-let raf=0,paneDirty=false;
-function sched(pane){if(pane)paneDirty=true;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;pickPrice();drawNums();if(paneDirty||['pos','port','live'].includes(tab)){paneDirty=false;drawPane()}})}
+let raf=0,paneDirty=false,lastPane=0;
+// numbers (price, PnL, stats) redraw on every tick; the active table/chart at most 4x per second
+function sched(pane){if(pane)paneDirty=true;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;pickPrice();drawNums();
+ if(paneDirty||(['pos','port','live'].includes(tab)&&Date.now()-lastPane>250)){paneDirty=false;lastPane=Date.now();drawPane()}})}
 const posPnl=p=>{const val=p.tok*priceSol;return {val,pnl:val+p.out-p.in}};
 function drawNums(){
  $('#bal').textContent=st.bal.toFixed(3)+' SOL'+(solUsd?' ≈ $'+(st.bal*solUsd).toFixed(0):'');if(!ca||!pair)return;
