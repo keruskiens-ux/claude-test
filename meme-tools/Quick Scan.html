@@ -118,7 +118,7 @@ const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p
  // plain-English summary (rule-based, no AI): biggest risk first
  const RW={'No market':'no trading pool exists','Already rugged':'RugCheck says it already rugged','Mint authority ON':'the dev can still mint new tokens','Freeze authority ON':'the dev can freeze your wallet','No real liquidity':'almost no liquidity ($'+k(liq)+') behind a $'+k(mc)+' market cap',
   'Top 10 hold too much':'the top 10 wallets hold '+(top10||0).toFixed(0)+'%','Fake wallets':'holders look farmed ('+Math.round(hpk)+' per $1K of market cap)','Insider networks':(ins||0)+' insider wallet networks','Transfer tax':tax+'% transfer tax','Botted volume':'volume looks botted (avg trade $'+avgTr.toFixed(0)+')',
-  'Low liquidity':'liquidity is thin ($'+k(liq)+')','LP not locked':'only '+(lp||0).toFixed(0)+'% of liquidity is locked','Single big holder':'one wallet holds '+single.toFixed(0)+'%','Dev still holding':'the dev still holds '+(cb||0).toFixed(1)+'%','Mutable metadata':'the dev can still change the name/image','Brand new (<2h)':'it is under 2 hours old'};
+  'Low liquidity':'liquidity is thin ($'+k(liq)+')','LP not locked':'only '+(lp||0).toFixed(0)+'% of liquidity is locked','Single big holder':'one wallet holds '+single.toFixed(0)+'%','Dev still holding':'the dev still holds '+(cb||0).toFixed(1)+'%','Mutable metadata':'the dev can still change the name/image','Brand new (<2h)':'it is under 2 hours old','Deep check incomplete':'the deep check could not finish (re-scan it)'};
  const reasons=[...names.filter(n=>n.startsWith('⛔')),...names.filter(n=>!n.startsWith('⛔'))].map(n=>n.replace(/^(⛔|⚠️) /,'')).map(n=>RW[n]||n.toLowerCase());
  SUMD[m]={v,en,reasons};const sumTxt=summary(SUMD[m]);
  try{localStorage.setItem('qs_card_'+m,JSON.stringify({t:Date.now(),rug:v==='PASS'?'NOT A RUG':v==='RISKY'?'RISKY':'RUG RISK',entry:EN[en][0].replace(/^\S+ /,''),flags:names.join(' | ')||'none',tips:'pending',wallet:'pending'}))}catch(e){}
@@ -148,7 +148,7 @@ async function go(append){const ms=[...new Set($('#in').value.match(/(?<![0-9a-z
 const wq=[];let wbusy=0;
 async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)return;let key='';try{key=localStorage.getItem('papertrade_helius')||''}catch(e){}
  if(!key){el.innerHTML='🔍 Wallet check: add Helius key in Paper Trade';return}const hs=HOLD[m]||[];if(!hs.length){el.textContent='🔍 Wallet check: no holder data';return}
- const rpc=async(mt,pr)=>{for(let i=0;i<4;i++){const r=await fetch('https://mainnet.helius-rpc.com/?api-key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})});if(r.status===429){await new Promise(z=>setTimeout(z,500*(i+1)));continue}return r.json()}return {}};
+ const rpc=async(mt,pr)=>{for(let i=0;i<6;i++){const r=await fetch('https://mainnet.helius-rpc.com/?api-key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})});if(r.status===429){await new Promise(z=>setTimeout(z,Math.random()*400+700*(i+1)));continue}return r.json()}return {}};
  let fresh=0,n=0;const fund={};
  await Promise.all(hs.map(async(h,ix)=>{await new Promise(z=>setTimeout(z,ix*120));return (async()=>{try{const r=await rpc('getSignaturesForAddress',[h.o,{limit:25}]);if(!r.result)return;n++;const sg=r.result;if(sg.length<10)fresh++;
   if(sg.length&&sg.length<25){const t=(await rpc('getTransaction',[sg[sg.length-1].signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}])).result;
@@ -156,23 +156,26 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
  const cl=Object.entries(fund).filter(([,v])=>v.n>=3).sort((a,b)=>b[1].p-a[1].p);const out=[];
  /* Fresh wallets warning CUT 2026-10-30: called real HELL fake; only fired on HYPERCHAN (already caught by zero tips) */
  cl.forEach(([f,v])=>out.push(risk('Cluster: '+v.n+' wallets, '+v.p.toFixed(1)+'%',v.p>=10,v.n+' top holders were all funded by the same wallet ('+f.slice(0,4)+'…'+f.slice(-4)+'). That\'s a Bubblemaps cluster — likely one person. They hold '+v.p.toFixed(1)+'% together and can dump at once. Over ~10% = skip.')));
+ await tradeCheck(m,rpc,out);
  // real holder count (wallets still holding >0) for young coins — RugCheck counts emptied wallets too (2-3x on old coins)
  try{const P0=PAIR[m],hEl=[...document.querySelectorAll('#out .card')].map(c=>c.querySelector('#wc_'+m)?c:null).find(Boolean);
   if(P0&&P0.ageH<720&&P0.rcH!=null&&P0.rcH<80000){const own=new Set();let pg=1,done=false;
    while(!done&&pg<=80){const r=await rpc('getTokenAccounts',{mint:m,limit:1000,page:pg});const ta=(r.result&&r.result.token_accounts)||[];ta.forEach(a=>{if(+a.amount>0)own.add(a.owner)});done=ta.length<1000;pg++}
    if(done){P0.realH=own.size;const card=document.getElementById('rp_'+m)?.closest('.card'),box=card&&card.querySelector('.st[data-t="Holders"] b');if(box)box.innerHTML=k(own.size)+' <span class="muted" style="font-size:10px">(RC '+k(P0.rcH)+')</span>';
     /* Holders dumped warning CUT 2026-10-30: never fired */}}}catch(e){}
- await tradeCheck(m,rpc,out);
+
  const bad=cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
- if(bad){const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
+ if(bad){const rp=document.getElementById('rp_'+m);if(rp){const tp=rp.closest('.card').querySelectorAll('.pill')[1];if(tp){tp.className='pill AVOID risk';tp.style.cssText='margin:0;background:none;border:1px solid currentColor';tp.textContent='⛔ DON\'T TRADE';tp.dataset.t='Entry timing: DON\'T TRADE';tp.dataset.x='The deep check found fake activity. Timing doesn\'t matter — skip it.'}rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
  const wStr=cl.length?cl.map(([,v])=>v.n+'-wallet cluster '+v.p.toFixed(1)+'%').join(', '):'clean ('+fresh+'/'+n+' fresh, no clusters)';
- try{const d=SUMD[m];if(d){if(bad){d.v='AVOID';if(PAIR[m]&&PAIR[m].noTips)d.reasons.unshift('no real trader paid a tip in the last '+((PAIR[m].fees||{}).kk||'15+')+' trades');cl.filter(([,v])=>v.p>=10).forEach(([,v])=>d.reasons.unshift(v.n+' linked wallets hold '+v.p.toFixed(0)+'%'))}const se=document.getElementById('sum_'+m);if(se){se.textContent=summary(d);se.className='sum '+d.v}}
+ try{const d=SUMD[m];if(d){const inc=PAIR[m]&&/FAILED/.test(PAIR[m].tipStr||'');if(inc&&!bad){d.reasons.unshift('the deep check could not finish (re-scan it)');if(d.v==='PASS'){d.v='RISKY';const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill RISKY risk';rp.textContent='🛡 RISKY'}}}if(bad){d.v='AVOID';if(PAIR[m]&&PAIR[m].noTips)d.reasons.unshift('no real trader paid a tip in the last '+((PAIR[m].fees||{}).kk||'15+')+' trades');cl.filter(([,v])=>v.p>=10).forEach(([,v])=>d.reasons.unshift(v.n+' linked wallets hold '+v.p.toFixed(0)+'%'))}const se=document.getElementById('sum_'+m);if(se){se.textContent=summary(d);se.className='sum '+d.v}}
   const c=JSON.parse(localStorage.getItem('qs_card_'+m)||'{}');c.tips=(PAIR[m]&&PAIR[m].tipStr)||'n/a';c.wallet=wStr;if(bad)c.rug='RUG RISK';c.t=Date.now();localStorage.setItem('qs_card_'+m,JSON.stringify(c))}catch(e){}
  el.outerHTML=out.length?out.join(''):'<div><span class="clean">🔍 Wallet map looks clean</span> <span class="muted">('+fresh+'/'+n+' fresh, no clusters)</span></div>'}
 const JITO=new Set(['96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5','HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe','Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY','ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49','DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh','ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt','DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL','3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT']);
 async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
- const sg=((await rpc('getSignaturesForAddress',[P.a,{limit:P.ageH<720?80:40}])).result||[]).filter(x=>!x.err).slice(0,P.ageH<720?60:30);const tx=[];
- for(let i=0;i<sg.length;i+=6)(await Promise.all(sg.slice(i,i+6).map(x=>rpc('getTransaction',[x.signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}]).then(r=>r.result).catch(()=>null)))).forEach(t=>t&&tx.push(t));
+ let tx=[];for(let att=0;att<3;att++){tx=[];
+ const sg=(((await rpc('getSignaturesForAddress',[P.a,{limit:P.ageH<720?80:40}]))||{}).result||[]).filter(x=>!x.err).slice(0,P.ageH<720?60:30);
+ for(let i=0;i<sg.length;i+=4)(await Promise.all(sg.slice(i,i+4).map(x=>rpc('getTransaction',[x.signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}]).then(r=>r.result).catch(()=>null)))).forEach(t=>t&&tx.push(t));
+ if(tx.length>=15||P.nTx<200)break;await new Promise(z=>setTimeout(z,3000*(att+1)+Math.random()*1000))}
  const WS='So11111111111111111111111111111111111111112';let tipped=0,prioSum=0;const buys=[],wal={},tradeFees=[];
  for(const t of tx){const ks=t.transaction.message.accountKeys,signer=ks[0].pubkey||ks[0];
   const ins=[...t.transaction.message.instructions,...(t.meta.innerInstructions||[]).flatMap(i=>i.instructions)];
@@ -181,7 +184,7 @@ async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
   // token side of the trader (works whether they paid in SOL or wrapped SOL)
   const tb=a=>(a||[]).filter(b=>b.mint===m&&b.owner===signer).reduce((x,b)=>x+(+b.uiTokenAmount.uiAmount||0),0);const dT=tb(t.meta.postTokenBalances)-tb(t.meta.preTokenBalances);
   if(dT!==0)tradeFees.push((prio+tip)/1e9);if(dT>0){buys.push({sz:+dT.toPrecision(2),t:t.blockTime||0});wal[signer]=(wal[signer]||0)+1}}
- const kk=tx.length,tf=tradeFees.sort((a,b)=>a-b),med=tf.length?tf[Math.floor(tf.length/2)]:0;P.fees={avg:med,kk,n:tf.length};P.tipStr=kk>=15?tipped+'/'+kk+' recent trades tipped':'too few trades to judge ('+kk+')';
+ const kk=tx.length,tf=tradeFees.sort((a,b)=>a-b),med=tf.length?tf[Math.floor(tf.length/2)]:0;P.fees={avg:med,kk,n:tf.length};P.tipStr=kk>=15?tipped+'/'+kk+' recent trades tipped':'too few trades to judge ('+kk+')';if(kk<15&&P.nTx>=200){P.tipStr='tip check FAILED (could only load '+kk+' trades — Helius limit)';out.push(risk('Deep check incomplete',0,'Could only load '+kk+' of the recent trades (Helius rate limit), so the tip check could not run. Re-scan this coin alone before trusting it.'))}
  // Fees box CUT 2026-10-30: could not tell real from fake (real Dacity/CLAUDIA read as low as fakes). Use Axiom Global Fees Paid by hand.
  if(kk>=15&&tipped===0&&(P.noTips=P.ageH<720,true))out.push(risk('No real-trader tips',P.ageH<720,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
  else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips — real traders present</div>');
