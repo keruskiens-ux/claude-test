@@ -1,0 +1,187 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Paper Trade</title>
+<style>
+:root{--bg:#07090d;--p:#10141c;--b:#232a38;--t:#e8e8ea;--m:#8a91a3;--g:#2fd6a0;--r:#ff5468;--y:#ffb020;--a:#6c7bff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 400px at 0 -10%,#1a1440 0,transparent 60%),var(--bg);color:var(--t);font:13px system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
+.banner{background:repeating-linear-gradient(45deg,#3a2a00,#3a2a00 10px,#2a1f00 10px,#2a1f00 20px);color:var(--y);text-align:center;font-weight:800;letter-spacing:2px;padding:3px;font-size:11px}
+header{display:flex;gap:18px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--b);flex-wrap:wrap}
+header .n{font-size:16px;font-weight:700}header .mc{font-size:20px;font-weight:800}
+.s{display:flex;flex-direction:column}.s span:first-child{color:var(--m);font-size:11px}
+.up{color:var(--g)}.dn{color:var(--r)}
+main{flex:1;display:grid;grid-template-columns:1fr 330px;min-height:0}
+.left{display:flex;flex-direction:column;min-height:0}
+#chart{flex:1;border:0;width:100%;min-height:300px;background:#000}
+.tabs{display:flex;gap:4px;border-top:1px solid var(--b);padding:4px 8px}
+.tabs button{background:none;border:0;color:var(--m);padding:6px 10px;cursor:pointer;font-weight:600}.tabs button.on{color:var(--t);border-bottom:2px solid var(--a)}
+.pane{height:200px;overflow:auto;padding:0 8px}table{width:100%;border-collapse:collapse}td,th{padding:5px 6px;border-bottom:1px solid #1b2030;text-align:left;font-size:12px}th{color:var(--m);font-weight:600}
+aside{border-left:1px solid var(--b);padding:10px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.box{background:linear-gradient(180deg,var(--p),#0c1017);border:1px solid var(--b);border-radius:14px;padding:10px}
+.bs{display:grid;grid-template-columns:1fr 1fr;gap:4px}.bs button{padding:9px;border-radius:8px;border:0;font-weight:700;cursor:pointer;background:#1b2030;color:var(--m)}
+.bs .buy.on{background:var(--g);color:#002}.bs .sell.on{background:var(--r);color:#fff}
+.amt{display:flex;align-items:center;background:#0e1118;border:1px solid var(--b);border-radius:8px;padding:6px 8px;margin:8px 0}.amt input{flex:1;background:none;border:0;color:var(--t);font-size:15px;outline:none}
+.q{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.q button{background:#1b2030;border:1px solid var(--b);color:var(--t);border-radius:6px;padding:6px;cursor:pointer}
+.go{width:100%;margin-top:8px;padding:12px;border:0;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer}
+.go.b{background:linear-gradient(135deg,#2fe0a5,#16b585);color:#032;box-shadow:0 0 18px #2fe0a533}.go.s{background:linear-gradient(135deg,#ff4d6a,#d92f4c);color:#fff;box-shadow:0 0 18px #ff4d6a33}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center}.g4 div span{display:block;color:var(--m);font-size:10px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.g3 div{background:#0e1118;border:1px solid var(--b);border-radius:8px;padding:6px;text-align:center}.g3 span{display:block;color:var(--m);font-size:10px}
+.muted{color:var(--m);font-size:11px}.row{display:flex;justify-content:space-between;align-items:center}
+a{color:#8ab4ff}.lnk{font-size:12px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1b2130;border:1px solid var(--y);padding:8px 14px;border-radius:8px;display:none}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px 0}.cal div{background:#0e1118;border:1px solid var(--b);border-radius:6px;min-height:34px;padding:3px 5px;font-size:11px}.cal .h{background:none;border:0;color:var(--m);text-align:center;min-height:0}.cal .w{background:#0f2a22;border-color:#1e6b54}.cal .l{background:#2c1218;border-color:#7a2433}.cal b{display:block;font-size:12px}
+.empty{display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:8px}
+</style></head><body>
+<header id="hdr"><span class="muted">Loading…</span></header>
+<main>
+ <div class="left">
+  <iframe id="chart"></iframe>
+  <div class="tabs"><button data-p="live" class="on">Live Trades</button><button data-p="pos">Positions</button><button data-p="hist">Trades</button><button data-p="hold">Holders</button><button data-p="port">Portfolio</button><button data-p="cal">PnL Calendar</button><button data-p="about">About</button></div>
+  <div class="pane" id="pane"></div>
+ </div>
+ <aside>
+  <div class="box">
+   <div class="row"><b>Paper Wallet</b><span><b id="bal">0</b> <a href="#" id="reset" class="muted">reset</a></span></div>
+  </div>
+  <div class="box">
+   <div class="bs"><button class="buy on" id="tBuy">Buy</button><button class="sell" id="tSell">Sell</button></div>
+   <div class="amt"><input id="amt" type="number" step="0.01" min="0" placeholder="0.0"><span id="unit">PAPER SOL</span></div>
+   <div class="q" id="quick"></div>
+   <div class="muted" style="margin-top:6px">Sim: <span id="slipTxt"></span> slippage · 1% fee · price = live</div>
+   <button class="go b" id="go">Paper Buy</button>
+  </div>
+  <div class="box">
+   <div class="g4"><div><span>Bought</span><b id="pB">0</b></div><div><span>Sold</span><b id="pS">0</b></div><div><span>Holding</span><b id="pH">0</b></div><div><span>PnL</span><b id="pP">0</b></div></div>
+   <div class="muted" style="text-align:center;margin-top:4px">values in SOL</div>
+  </div>
+  <div class="box"><b>Token Info</b><div class="g3" id="sec" style="margin-top:8px"></div></div>
+  <div class="box lnk" id="links"></div>
+  <div class="box"><b>Live feed</b> <span id="feedSt" class="muted">off</span><div class="muted" style="margin:4px 0">Paste your free Helius API key to turn on live trades.</div><input id="hk" placeholder="Paste Helius API key (xxxxxxxx-xxxx-…)" style="width:100%;padding:6px;background:#0e1118;color:#fff;border:1px solid #333;border-radius:6px"></div>
+ </aside>
+</main>
+<div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s), ca=new URLSearchParams(location.search).get('ca');
+const K='papertrade_v1', START=10, FEE=0.01, SLIP=0.02;
+let st; try{st=JSON.parse(localStorage.getItem(K))}catch(e){} if(!st) st={bal:START,pos:{},hist:[]};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(st))}catch(e){}};
+let side='buy', pair=null, rc=null, priceSol=0, priceUsd=0, solUsd=0, tab='live';
+const fmt=(n,d=2)=>n==null?'-':Math.abs(n)>=1e6?(n/1e6).toFixed(1)+'M':Math.abs(n)>=1e3?(n/1e3).toFixed(1)+'K':(+n).toFixed(d);
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._);t._=setTimeout(()=>t.style.display='none',2200)};
+const f=u=>fetch(u).then(r=>r.ok?r.json():null).catch(()=>null);
+$('#slipTxt').textContent=(SLIP*100)+'%';
+
+if(!ca){const o=document.createElement('div');o.className='empty';o.style.cssText='position:fixed;inset:24px 0 0 0;background:var(--bg);z-index:5';o.innerHTML='<h2>No coin selected</h2><div class="muted">Open this from Quick Scan → Paper Trade, or paste a CA:</div><input id="ci" style="width:420px;padding:8px;background:#0e1118;color:#fff;border:1px solid #333;border-radius:8px"><button class="go b" style="width:200px" id="ciGo">Open</button>';document.body.appendChild(o);$('#ciGo').onclick=()=>{const v=$('#ci').value.trim();if(v)location.search='?ca='+v};$('#hdr').innerHTML='<b>Paper Trade</b>';}
+else init();
+
+async function init(){
+ await refresh(true);
+ if(pair){
+  $('#chart').src='https://dexscreener.com/solana/'+pair.pairAddress+'?embed=1&theme=dark&info=0&trades=0';
+  $('#links').innerHTML=`<a target=_blank href="https://v2.bubblemaps.io/map?address=${ca}&chain=solana">Bubblemaps</a> · <a target=_blank href="https://rugcheck.xyz/tokens/${ca}">RugCheck</a> · <a target=_blank href="https://solscan.io/token/${ca}">Solscan</a> · <a target=_blank href="https://gmgn.ai/sol/token/${ca}">GMGN</a>`;
+ }
+ loadRC(); startFeed(); setInterval(refresh,2000); setInterval(loadRC,60000);
+}
+async function refresh(first){
+ const d=await f('https://api.dexscreener.com/tokens/v1/solana/'+ca);
+ if(!d||!d.length){ if(first) $('#hdr').innerHTML='<span class="dn">No live pair found for this CA.</span>'; return }
+ pair=d.sort((a,b)=>((b.liquidity||{}).usd||0)-((a.liquidity||{}).usd||0))[0];
+ priceUsd=+pair.priceUsd||0; const pn=+pair.priceNative||0; const q=(pair.quoteToken||{}).symbol||'';
+ if(q==='SOL'||q==='WSOL'){priceSol=pn; solUsd=pn?priceUsd/pn:solUsd}
+ else { if(!solUsd){const s=await f('https://api.dexscreener.com/tokens/v1/solana/So11111111111111111111111111111111111111112');const sp=(s||[]).find(p=>p.quoteToken&&/USD/.test(p.quoteToken.symbol));solUsd=sp?+sp.priceUsd:0}
+   priceSol=solUsd?priceUsd/solUsd:0 }
+ const ch=pair.priceChange||{}, c=v=>`<b class="${v>=0?'up':'dn'}">${v>=0?'+':''}${v??0}%</b>`;
+ $('#hdr').innerHTML=`<span class="n">${pair.baseToken.symbol} <span class="muted">${pair.baseToken.name}</span></span><span class="mc">$${fmt(pair.marketCap||pair.fdv)}</span>
+ <div class="s"><span>Price</span><b>$${priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4)}</b></div><div class="s"><span>Liquidity</span><b>$${fmt((pair.liquidity||{}).usd)}</b></div>
+ <div class="s"><span>Vol 24h</span><b>$${fmt((pair.volume||{}).h24)}</b></div><div class="s"><span>5m</span>${c(ch.m5)}</div><div class="s"><span>1h</span>${c(ch.h1)}</div><div class="s"><span>24h</span>${c(ch.h24)}</div>
+ <div class="s"><span>Pair</span><b>${pair.baseToken.symbol}/${q}</b></div><div class="s"><span>Txns 5m</span><b><span class="up">${(pair.txns&&pair.txns.m5||{}).buys||0}</span>/<span class="dn">${(pair.txns&&pair.txns.m5||{}).sells||0}</span></b></div>`;
+ document.title=pair.baseToken.symbol+' $'+fmt(pair.marketCap||pair.fdv)+' | Paper';
+ draw();
+}
+async function loadRC(){ rc=await f('https://api.rugcheck.xyz/v1/tokens/'+ca+'/report'); drawSec(); if(tab==='hold')drawPane() }
+function drawSec(){
+ if(!rc){$('#sec').innerHTML='<div class="muted" style="grid-column:1/4">RugCheck unavailable</div>';return}
+ const top10=(rc.topHolders||[]).slice(0,10).reduce((s,h)=>s+(h.pct||0),0), lp=Math.max(0,...(rc.markets||[]).map(x=>(x.lp||{}).lpLockedPct||0));
+ const cell=(l,v,ok)=>`<div><b class="${ok?'up':'dn'}">${v}</b><span>${l}</span></div>`;
+ $('#sec').innerHTML=cell('Top 10 H.',top10.toFixed(1)+'%',top10<=25)+cell('LP Locked',lp.toFixed(0)+'%',lp>=80)+cell('Insider nets',rc.graphInsidersDetected||0,(rc.graphInsidersDetected||0)<=3)
+ +cell('Mint Auth',rc.mintAuthority?'ON':'No',!rc.mintAuthority)+cell('Freeze Auth',rc.freezeAuthority?'ON':'No',!rc.freezeAuthority)+cell('Holders',fmt(rc.totalHolders||0,0),(rc.totalHolders||0)>=200);
+}
+function P(){return st.pos[ca]||(st.pos[ca]={sym:pair?pair.baseToken.symbol:'?',tok:0,cost:0,in:0,out:0})}
+function quick(){const q=$('#quick');q.innerHTML=(side==='buy'?['0.1','0.5','1','5']:['25%','50%','75%','100%']).map(v=>`<button>${v}</button>`).join('');
+ q.querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#amt').value=b.textContent.replace('%','')})}
+function setSide(s){side=s;$('#tBuy').classList.toggle('on',s==='buy');$('#tSell').classList.toggle('on',s==='sell');$('#unit').textContent=s==='buy'?'PAPER SOL':'% OF BAG';
+ const g=$('#go');g.className='go '+(s==='buy'?'b':'s');g.textContent=s==='buy'?'Paper Buy':'Paper Sell';$('#amt').value='';quick()}
+$('#tBuy').onclick=()=>setSide('buy');$('#tSell').onclick=()=>setSide('sell');
+$('#go').onclick=()=>{
+ if(!priceSol)return toast('No live price yet');const v=+$('#amt').value;if(!(v>0))return toast('Enter an amount');const p=P();
+ if(side==='buy'){ if(v>st.bal)return toast('Not enough paper SOL');
+  const fill=priceSol*(1+SLIP), tok=v*(1-FEE)/fill; st.bal-=v; p.tok+=tok; p.cost+=v; p.in+=v; p.sym=pair.baseToken.symbol;
+  st.hist.unshift({t:Date.now(),ca,sym:p.sym,side:'BUY',sol:v,tok,mc:pair.marketCap||pair.fdv}); toast(`Paper bought ${fmt(tok)} ${p.sym} for ${v} SOL`)}
+ else{ if(!p.tok)return toast('You hold none');const pct=Math.min(v,100)/100, tok=p.tok*pct, fill=priceSol*(1-SLIP), sol=tok*fill*(1-FEE), basis=p.cost*pct;
+  p.cost-=basis; p.tok-=tok; p.out+=sol; st.bal+=sol;
+  st.hist.unshift({t:Date.now(),ca,sym:p.sym,side:'SELL',sol,tok,pnl:sol-basis,mc:pair.marketCap||pair.fdv}); toast(`Paper sold ${pct*100}% for ${sol.toFixed(3)} SOL`)}
+ save();draw()};
+$('#reset').onclick=e=>{e.preventDefault();if(confirm('Reset paper wallet to '+START+' SOL and clear history?')){st={bal:START,pos:{},hist:[]};save();draw()}};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.p;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));drawPane()});
+function draw(){$('#bal').textContent=st.bal.toFixed(3)+' SOL'+(solUsd?' ≈ $'+(st.bal*solUsd).toFixed(0):'');if(!ca)return;const p=st.pos[ca];
+ const val=p?p.tok*priceSol:0, pnl=p?val+p.out-p.in:0;
+ $('#pB').textContent=p?p.in.toFixed(2):0;$('#pS').textContent=p?p.out.toFixed(2):0;$('#pH').textContent=val.toFixed(3);
+ const e=$('#pP');e.textContent=(pnl>=0?'+':'')+pnl.toFixed(3)+(solUsd?' ($'+(pnl*solUsd).toFixed(0)+')':'')+(p&&p.in?` (${(pnl/p.in*100).toFixed(0)}%)`:'');e.className=pnl>=0?'up':'dn';drawPane()}
+function drawPane(){const el=$('#pane');
+ if(tab==='pos'){const rows=Object.entries(st.pos).filter(([,p])=>p.tok>0||p.in>0);
+  el.innerHTML='<table><tr><th>Token</th><th>Bought</th><th>Sold</th><th>Holding</th><th>PnL</th></tr>'+rows.map(([k,p])=>{const live=k===ca, val=live?p.tok*priceSol:null, pnl=live?val+p.out-p.in:null;
+   return `<tr><td><a href="?ca=${k}">${p.sym}</a></td><td>${p.in.toFixed(2)}</td><td>${p.out.toFixed(2)}</td><td>${live?val.toFixed(3):'open to update'}</td><td class="${pnl>=0?'up':'dn'}">${live?(pnl>=0?'+':'')+pnl.toFixed(3):'-'}</td></tr>`}).join('')+'</table>'}
+ if(tab==='hist'){el.innerHTML='<div class="row" style="padding:4px 0"><span class="muted">Your paper trades</span><a href="#" id="csv">Export CSV for vault</a></div><table><tr><th>Time</th><th>Token</th><th>Side</th><th>SOL</th><th>MC at trade</th></tr>'+st.hist.slice(0,200).map(h=>`<tr><td>${new Date(h.t).toLocaleString()}</td><td>${h.sym}</td><td class="${h.side==='BUY'?'up':'dn'}">${h.side}</td><td>${h.sol.toFixed(3)}</td><td>$${fmt(h.mc)}</td></tr>`).join('')+'</table>';
+  $('#csv').onclick=e=>{e.preventDefault();const c='time,token,ca,side,sol,tokens,mc\n'+st.hist.map(h=>[new Date(h.t).toISOString(),h.sym,h.ca,h.side,h.sol,h.tok,h.mc].join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='paper_trades.csv';a.click()}}
+ if(tab==='hold'){if(!rc){el.innerHTML='<div class="muted">Loading holders…</div>';return}
+  el.innerHTML='<table><tr><th>#</th><th>Wallet</th><th>% Supply</th><th>Insider?</th></tr>'+(rc.topHolders||[]).slice(0,20).map((h,i)=>`<tr><td>${i+1}</td><td><a target=_blank href="https://solscan.io/account/${h.owner||h.address}">${(h.owner||h.address||'').slice(0,4)}…${(h.owner||h.address||'').slice(-4)}</a></td><td>${(h.pct||0).toFixed(2)}%</td><td>${h.insider?'<span class="dn">yes</span>':''}</td></tr>`).join('')+'</table>'}
+ if(tab==='about'){const i=(pair&&pair.info)||{},sym=pair?pair.baseToken.symbol:'';el.innerHTML='<div style="padding:8px;line-height:1.7"><b>'+(pair?pair.baseToken.name:'')+' ($'+sym+')</b><br>Age: '+(pair&&pair.pairCreatedAt?Math.round((Date.now()-pair.pairCreatedAt)/36e5)+'h':'-')+'<br>'+((i.websites||[]).map(w=>'<a target=_blank href="'+w.url+'">🌐 Website</a>').join(' ')||'No website')+' '+((i.socials||[]).map(x=>'<a target=_blank href="'+x.url+'">'+x.type+'</a>').join(' '))+'<br><b>Narrative:</b> <a target=_blank href="https://x.com/search?q=%24'+sym+'&f=live">Search $'+sym+' on X (live)</a> · <a target=_blank href="https://x.com/search?q='+ca+'&f=live">Search CA on X</a><br><span class="muted">Ask: what is this coin about, is the story real/current, who is posting it?</span></div>';return}
+ if(tab==='live')return drawLive(el);
+ if(tab==='cal')return drawCal(el);
+ if(tab==='port'){const tot=st.hist.length, buys=st.hist.filter(h=>h.side==='BUY').reduce((s,h)=>s+h.sol,0), sells=st.hist.filter(h=>h.side==='SELL').reduce((s,h)=>s+h.sol,0);
+  el.innerHTML=`<div style="padding:8px"><div>Paper balance: <b>${st.bal.toFixed(3)} SOL</b> (started ${START})</div><div>Trades: <b>${tot}</b> · Total bought: <b>${buys.toFixed(2)}</b> · Total sold: <b>${sells.toFixed(2)}</b> SOL</div><div class="muted" style="margin-top:6px">Open coins keep their tokens; open a coin to see its live value.</div></div>`}
+}
+
+// ===== Live trade feed (Solana RPC websocket; free) =====
+const HK='papertrade_helius';let trades=[],ws=null,seen=new Set(),q=[],busy=false;
+function rpcUrls(){let k='';try{k=localStorage.getItem(HK)||''}catch(e){}
+ k=k.trim();if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k))k='';
+ return k?{http:'https://mainnet.helius-rpc.com/?api-key='+k,ws:'wss://mainnet.helius-rpc.com/?api-key='+k}:{http:'https://api.mainnet-beta.solana.com',ws:'wss://api.mainnet-beta.solana.com'}}
+function startFeed(){if(!pair||!pair.pairAddress)return;if(!rpcUrls().http.includes('helius')){$('#feedSt').innerHTML='<span class="dn">needs Helius key ↓</span>';return}try{ws&&ws.close()}catch(e){}
+ const u=rpcUrls();ws=new WebSocket(u.ws);$('#feedSt').textContent='connecting…';
+ ws.onopen=()=>{startPoll();ws.send(JSON.stringify({jsonrpc:'2.0',id:1,method:'logsSubscribe',params:[{mentions:[pair.pairAddress]},{commitment:'confirmed'}]}));$('#feedSt').innerHTML='<span class="up">● live</span>'};
+ ws.onmessage=e=>{const m=JSON.parse(e.data),v=m.params&&m.params.result&&m.params.result.value;if(!v||v.err||seen.has(v.signature))return;seen.add(v.signature);q.push(v.signature);if(q.length>40)q.shift();pump()};
+ ws.onclose=()=>{fails++;if(fails>=2){startPoll();return}$('#feedSt').innerHTML='<span class="dn">reconnecting…</span>';setTimeout(startFeed,3000)};ws.onerror=()=>{}}
+let fails=0,polling=null,lastSig=null;
+function startPoll(){if(polling)return;try{ws&&(ws.onclose=null,ws.close())}catch(e){}$('#feedSt').innerHTML='<span class="up">● live</span>';
+ polling=setInterval(async()=>{try{const r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getSignaturesForAddress',params:[pair.pairAddress,{limit:15}]})}).then(r=>r.json());
+  if(r.error){$('#feedSt').innerHTML='<span class="dn">error: '+r.error.message+'</span>';return}
+  const sigs=(r.result||[]).filter(x=>!x.err).map(x=>x.signature);const fresh=[];for(const g of sigs){if(g===lastSig)break;fresh.push(g)}
+  if(sigs.length)lastSig=sigs[0];fresh.reverse().forEach(g=>{if(!seen.has(g)){seen.add(g);q.push(g)}});pump()}catch(e){$('#feedSt').innerHTML='<span class="dn">rate-limited, retrying…</span>'}},rpcUrls().http.includes('helius')?2000:4000)}
+async function pump(){if(busy)return;busy=true;while(q.length){const sig=q.shift();await parseTx(sig);await new Promise(r=>setTimeout(r,rpcUrls().http.includes('helius')?80:400))}busy=false}
+async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getTransaction',params:[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:1,commitment:'confirmed'}]})}).then(r=>r.json());
+ if(r.error){$('#feedSt').innerHTML='<span class="dn">tx error: '+r.error.message+'</span>';return}const tx=r.result;if(!tx)return;const signer=tx.transaction.message.accountKeys[0].pubkey||tx.transaction.message.accountKeys[0];
+ const bal=a=>(a||[]).filter(b=>b.mint===ca&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
+ const dTok=bal(tx.meta.postTokenBalances)-bal(tx.meta.preTokenBalances);if(!dTok)return;
+ const dSol=Math.abs((tx.meta.postBalances[0]-tx.meta.preBalances[0])/1e9);
+ if(dSol>0.05){priceSol=dSol/Math.abs(dTok);draw()}
+ trades.unshift({t:(tx.blockTime||Date.now()/1000)*1000,side:dTok>0?'BUY':'SELL',tok:Math.abs(dTok),sol:dSol,w:signer,sig});if(trades.length>100)trades.pop();
+ if(tab==='live')drawPane()}catch(e){}}
+$('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
+$('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
+ try{localStorage.setItem(HK,v)}catch(e){};fails=0;clearInterval(polling);polling=null;startFeed();toast(v?'Helius key saved':'Using public network')};
+function drawLive(el){const c={};trades.slice(0,40).forEach(x=>c[x.w]=(c[x.w]||0)+1);const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];
+ const warn=trades.length>=15&&top&&top[1]/Math.min(trades.length,40)>=.3?'<div style="padding:6px;color:#ff4d6a;font-weight:700">⚠️ Wash trading? Wallet '+top[0].slice(0,4)+'…'+top[0].slice(-4)+' made '+top[1]+' of the last '+Math.min(trades.length,40)+' trades — fake volume.</div>':'';
+ el.innerHTML=warn+'<table><tr><th>Age</th><th>Side</th><th>SOL</th><th>Tokens</th><th>Wallet</th></tr>'+(trades.length?trades.map(x=>{const a=Math.round((Date.now()-x.t)/1000);return `<tr><td>${a<60?a+'s':Math.round(a/60)+'m'}</td><td class="${x.side==='BUY'?'up':'dn'}">${x.side}</td><td>${x.sol.toFixed(3)}</td><td>${fmt(x.tok)}</td><td><a target=_blank href="https://solscan.io/tx/${x.sig}">${x.w.slice(0,4)}…${x.w.slice(-4)}</a></td></tr>`}).join(''):'<tr><td colspan=5 class="muted">Waiting for trades… (quiet coins may take a while)</td></tr>')+'</table>'}
+setInterval(()=>{if(tab==='live')drawPane()},5000);
+
+let cm=new Date();cm.setDate(1);
+function drawCal(el){const y=cm.getFullYear(),m=cm.getMonth(),days=new Date(y,m+1,0).getDate(),first=new Date(y,m,1).getDay(),by={};
+ st.hist.filter(h=>h.side==='SELL'&&h.pnl!=null).forEach(h=>{const d=new Date(h.t);if(d.getFullYear()===y&&d.getMonth()===m)by[d.getDate()]=(by[d.getDate()]||0)+h.pnl});
+ const tot=Object.values(by).reduce((a,b)=>a+b,0),wins=Object.values(by).filter(v=>v>0).length,losses=Object.values(by).filter(v=>v<0).length;
+ let g='<div class="row" style="padding:4px 0"><a href="#" id="cp">◀</a><b>'+cm.toLocaleString(undefined,{month:'long',year:'numeric'})+'</b><a href="#" id="cn">▶</a></div>';
+ g+='<div class="muted">Realized PnL: <b class="'+(tot>=0?'up':'dn')+'">'+(tot>=0?'+':'')+tot.toFixed(3)+' SOL</b> · green days '+wins+' · red days '+losses+'</div><div class="cal">';
+ g+=['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>'<div class="h">'+d+'</div>').join('');
+ for(let i=0;i<first;i++)g+='<div style="visibility:hidden"></div>';
+ for(let d=1;d<=days;d++){const v=by[d];g+='<div class="'+(v>0?'w':v<0?'l':'')+'">'+d+(v!=null?'<b class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v.toFixed(2)+'</b>':'')+'</div>'}
+ el.innerHTML=g+'</div>';$('#cp').onclick=e=>{e.preventDefault();cm.setMonth(cm.getMonth()-1);drawPane()};$('#cn').onclick=e=>{e.preventDefault();cm.setMonth(cm.getMonth()+1);drawPane()}}
+setSide('buy');draw();
+</script></body></html>
