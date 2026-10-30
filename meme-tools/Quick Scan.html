@@ -72,7 +72,8 @@ async function one(m){
  const AGE=p&&p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/36e5:0,OLD=AGE>24*30;
  if(!p)add('No market',1);else if(mc>100000&&liq<Math.max(1000,mc*0.002))add('No real liquidity',1,'Pool holds only $'+k(liq)+' against a $'+k(mc)+' market cap ('+(mc?(liq/mc*100).toFixed(2):0)+'%). You cannot sell anything meaningful — the market cap is fake. Real coins (even BONK across many pools) are 0.4%+.');else if(liq<R.minLiq)add('Low liquidity',0);
  let top10=null,lp=null,ins=null,holders=null,tax=0,cb=null,single=0;
- if(rc){top10=(rc.topHolders||[]).slice(0,10).reduce((s,h)=>s+(h.pct||0),0);single=Math.max(0,...(rc.topHolders||[]).map(h=>h.pct||0));
+ if(rc){const _ka=(rc&&rc.knownAccounts)||{},_pool=new Set();((rc&&rc.markets)||[]).forEach(x=>[x.liquidityA,x.liquidityB,x.pubkey,x.liquidityAAccount,x.liquidityBAccount].forEach(a=>a&&_pool.add(a)));const isPool=h=>_pool.has(h.address)||_pool.has(h.owner)||/AMM/i.test(((_ka[h.owner]||_ka[h.address]||{}).type)||'');const realH=((rc&&rc.topHolders)||[]).filter(h=>!isPool(h));// pool/AMM wallets skipped (matches Axiom: MEW 77%->66%)
+  top10=realH.slice(0,10).reduce((s,h)=>s+(h.pct||0),0);single=Math.max(0,...realH.map(h=>h.pct||0));
   lp=Math.max(0,...(rc.markets||[]).map(x=>(x.lp||{}).lpLockedPct||0));ins=rc.graphInsidersDetected||0;holders=rc.totalHolders;
   tax=((rc.transferFee||{}).pct)||0;cb=rc.creatorBalance!=null&&rc.token&&rc.token.supply?rc.creatorBalance/rc.token.supply*100:null;
   if(rc.rugged)add('Already rugged',1);if(rc.mintAuthority)add('Mint authority ON',1);if(rc.freezeAuthority)add('Freeze authority ON',1);
@@ -90,8 +91,8 @@ const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p
  if(!OLD&&AGE<24*7&&nTx>3000&&avgTr<35)add('Botted volume',0,'Average trade is only $'+avgTr.toFixed(0)+' across '+k(nTx)+' trades. Bots make tons of tiny buys to fake volume. Check if fees match the market cap.');
  if((t24.buys||0)>50&&!(t24.sells))add('Honeypot',1,(t24.buys)+' buys and ZERO sells in 24h. People can buy but nobody can sell — the contract blocks sells. Never buy.');
  const ageH=p&&p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/36e5:99;if(ageH<2)add('Brand new (<2h)',0,'Only '+Math.round(ageH*60)+' minutes old. Most rugs happen in the first 1-2 hours. If it survives 2h+ with real holders, rug odds drop a lot.');
- if(p)PAIR[m]={a:p.pairAddress,mc,nTx,vol,ageH,sol:(+p.priceNative&&+p.priceUsd)?(+p.priceUsd/+p.priceNative):0,q:(p.quoteToken||{}).symbol};
- if(rc&&rc.topHolders)HOLD[m]=rc.topHolders.slice(0,15).filter(h=>h.owner).map(h=>({o:h.owner,p:h.pct||0}));
+ if(p)PAIR[m]={rcH:holders,a:p.pairAddress,mc,nTx,vol,ageH,sol:(+p.priceNative&&+p.priceUsd)?(+p.priceUsd/+p.priceNative):0,q:(p.quoteToken||{}).symbol};
+ if(rc&&rc.topHolders)HOLD[m]=rc.topHolders.filter(h=>!(((rc.markets||[]).some(x=>[x.liquidityA,x.liquidityB,x.pubkey].includes(h.address)))||/AMM/i.test((((rc.knownAccounts||{})[h.owner]||{}).type)||''))).slice(0,15).filter(h=>h.owner).map(h=>({o:h.owner,p:h.pct||0}));
  let en,ex;const _c=(p&&p.priceChange)||{},h1=+_c.h1||0,h6=+_c.h6||0,h24=+_c.h24||0,m5=+_c.m5||0;
  if(hard){en='DONT';ex='It failed the rug check. Timing doesn\'t matter — skip it.'}
  else if(h1>60||h6>200||h24>400){en='LATE';ex='Already pumped hard ('+(h1>60?'+'+h1+'% in 1h':h6>200?'+'+h6+'% in 6h':'+'+h24+'% in 24h')+'). Buying after a big run usually means buying the top — early buyers sell into you. Wait for a pullback (20-40% dip, then buyers return) or skip.'}
@@ -139,23 +140,29 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
  const cl=Object.entries(fund).filter(([,v])=>v.n>=3).sort((a,b)=>b[1].p-a[1].p);const out=[];
  if(n&&fresh/n>=.4)out.push(risk('Fresh wallets',1,fresh+' of '+n+' top holders are brand-new wallets (under 10 transactions ever). One person spreading supply across new wallets to look like real buyers, then dumping.'));
  cl.forEach(([f,v])=>out.push(risk('Cluster: '+v.n+' wallets, '+v.p.toFixed(1)+'%',v.p>=10,v.n+' top holders were all funded by the same wallet ('+f.slice(0,4)+'…'+f.slice(-4)+'). That\'s a Bubblemaps cluster — likely one person. They hold '+v.p.toFixed(1)+'% together and can dump at once. Over ~10% = skip.')));
+ // real holder count (wallets still holding >0) for young coins — RugCheck counts emptied wallets too (2-3x on old coins)
+ try{const P0=PAIR[m],hEl=[...document.querySelectorAll('#out .card')].map(c=>c.querySelector('#wc_'+m)?c:null).find(Boolean);
+  if(P0&&P0.ageH<720&&P0.rcH!=null&&P0.rcH<20000){const own=new Set();let pg=1,done=false;
+   while(!done&&pg<=25){const r=await rpc('getTokenAccounts',{mint:m,limit:1000,page:pg});const ta=(r.result&&r.result.token_accounts)||[];ta.forEach(a=>{if(+a.amount>0)own.add(a.owner)});done=ta.length<1000;pg++}
+   if(done){P0.realH=own.size;const card=document.getElementById('rp_'+m)?.closest('.card'),box=card&&card.querySelector('.st[data-t="Holders"] b');if(box)box.innerHTML=k(own.size)+' <span class="muted" style="font-size:10px">(RC '+k(P0.rcH)+')</span>';
+    if(P0.rcH>200&&own.size<P0.rcH*0.2)out.push(risk('Holders dumped',0,'RugCheck lists '+P0.rcH+' holder accounts but only '+own.size+' wallets still hold any. Most "holders" already sold or were farmed wallets that got emptied.'))}}}catch(e){}
  await tradeCheck(m,rpc,out);
  const bad=(n&&fresh/n>=.4)||cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
  if(bad){const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
  el.outerHTML=out.length?out.join(''):'<div><span class="clean">🔍 Wallet map looks clean</span> <span class="muted">('+fresh+'/'+n+' fresh, no clusters)</span></div>'}
 const JITO=new Set(['96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5','HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe','Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY','ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49','DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh','ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt','DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL','3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT']);
 async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
- const sg=((await rpc('getSignaturesForAddress',[P.a,{limit:40}])).result||[]).filter(x=>!x.err).slice(0,30);const tx=[];
+ const sg=((await rpc('getSignaturesForAddress',[P.a,{limit:P.ageH<720?80:40}])).result||[]).filter(x=>!x.err).slice(0,P.ageH<720?60:30);const tx=[];
  for(let i=0;i<sg.length;i+=6)(await Promise.all(sg.slice(i,i+6).map(x=>rpc('getTransaction',[x.signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}]).then(r=>r.result).catch(()=>null)))).forEach(t=>t&&tx.push(t));
- const WS='So11111111111111111111111111111111111111112';let tipped=0,prioSum=0;const buys=[],wal={};
+ const WS='So11111111111111111111111111111111111111112';let tipped=0,prioSum=0;const buys=[],wal={},tradeFees=[];
  for(const t of tx){const ks=t.transaction.message.accountKeys,signer=ks[0].pubkey||ks[0];
   const ins=[...t.transaction.message.instructions,...(t.meta.innerInstructions||[]).flatMap(i=>i.instructions)];
   const tip=ins.filter(i=>i.program==='system'&&i.parsed&&i.parsed.info&&JITO.has(i.parsed.info.destination)).reduce((a,i)=>a+(+i.parsed.info.lamports||0),0);
   const prio=Math.max(0,t.meta.fee-5000*(t.transaction.signatures||[1]).length);prioSum+=(prio+tip)/1e9;if(tip>0||prio>50000)tipped++;
   // token side of the trader (works whether they paid in SOL or wrapped SOL)
   const tb=a=>(a||[]).filter(b=>b.mint===m&&b.owner===signer).reduce((x,b)=>x+(+b.uiTokenAmount.uiAmount||0),0);const dT=tb(t.meta.postTokenBalances)-tb(t.meta.preTokenBalances);
-  if(dT>0){buys.push({sz:+dT.toPrecision(2),t:t.blockTime||0});wal[signer]=(wal[signer]||0)+1}}
- const kk=tx.length;P.fees={avg:kk?prioSum/kk:0,kk};
+  if(dT!==0)tradeFees.push((prio+tip)/1e9);if(dT>0){buys.push({sz:+dT.toPrecision(2),t:t.blockTime||0});wal[signer]=(wal[signer]||0)+1}}
+ const kk=tx.length,tf=tradeFees.sort((a,b)=>a-b),med=tf.length?tf[Math.floor(tf.length/2)]:0;P.fees={avg:med,kk,n:tf.length};
  // ≈ Axiom "Global Fees Paid": real traders pay priority fees + tips; wash bots pay ~nothing
  const est24=P.fees.avg*P.nTx,perM=P.mc?est24/(P.mc/1e6):0;P.fees.perM=perM;
  const fe=document.getElementById('fe_'+m);if(fe)fe.innerHTML='<span>Fees 24h est.</span><b class="'+(P.ageH<720&&perM<2?'bad':perM>=10?'good':'')+'">'+(est24<1?est24.toFixed(2):est24.toFixed(0))+' SOL</b>';
