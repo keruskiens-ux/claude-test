@@ -151,25 +151,50 @@ let dsSol=0,dsUsd=0,livePx=[];
 // First 5 readings vs DexScreener: within 4% -> live OK; otherwise live pricing OFF for this coin.
 let calib={r:[],ok:null};
 function calibOk(p){if(calib.ok!==null)return calib.ok;if(!dsSol)return false;calib.r.push(p/dsSol);if(calib.r.length<5)return false;const s=calib.r.slice().sort((a,b)=>a-b),m=s[2];calib.ok=Math.abs(m-1)<0.04;calib.m=m;return calib.ok}
-function applyLive(){if(livePx[0]&&livePx[0].p&&!livePx[0].cal){livePx[0].cal=1;calibOk(livePx[0].p)}const wsOn=vws&&vws.readyState===1&&vBal.t>0;const fresh=livePx.filter(x=>wsOn?x.src==='ws'&&Date.now()-x.at<120000:Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
+function applyLive(){if(livePx[0]&&livePx[0].p&&!livePx[0].cal){livePx[0].cal=1;calibOk(livePx[0].p)}const wsOn=vws&&vws.readyState===1&&livePx.some(x=>x.src==='ws');const fresh=livePx.filter(x=>wsOn?x.src==='ws'&&Date.now()-x.at<120000:Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
  if(calib.ok===false){if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — this pool type (concentrated liquidity) can\'t be priced live (pool read '+(calib.m||0).toFixed(2)+'x DexScreener)';return false}
  if(fresh.length&&dsSol&&calib.ok){const r=fresh.slice(0,wsOn?1:3).map(x=>x.p).sort((a,b)=>a-b),med=r[Math.floor(r.length/2)];
   if(med>dsSol*0.5&&med<dsSol*2){priceSol=med;priceUsd=solUsd?med*solUsd:dsUsd*med/dsSol;if(vl)vl.textContent='$'+(priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4));
-   if(el){const lag=Math.round((Date.now()-fresh[0].bt)/1000);el.innerHTML='<b class="up">⚡ live on-chain</b> · '+(fresh[0].src==='ws'?'websocket (instant)':'last trade '+lag+'s ago')}return true}}
+   if(el){const lag=Math.round((Date.now()-fresh[0].bt)/1000);el.innerHTML='<b class="up">⚡ live on-chain</b> · '+(fresh[0].src==='ws'?'websocket (instant) · '+vSrc:'last trade '+lag+'s ago')}return true}}
  if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — no fresh on-chain trade';return false}
 setInterval(()=>{if(pair){applyLive();draw()}},1000);
 // ===== WEBSOCKET pool vaults: Helius pushes every balance change of the pool's SOL + token vaults (no queue, no polling) =====
-let vws=null,vSub='',vBal={t:null,s:null},vKeys={};
-function vaultSub(){try{if(!pair||!rc||!rc.markets)return;const k=rpcUrls();if(!k.ws.includes('helius'))return;
- const mk=rc.markets.find(x=>x.pubkey===pair.pairAddress);if(!mk||!mk.liquidityA||!mk.liquidityB)return;
- const baseIsA=mk.mintA===ca,tv=baseIsA?mk.liquidityA:mk.liquidityB,sv=baseIsA?mk.liquidityB:mk.liquidityA,sm=baseIsA?mk.mintB:mk.mintA;
- if(sm!==WSM)return; // only SOL-paired pools
- const key=tv+sv;if(vSub===key&&vws&&vws.readyState<2)return;vSub=key;try{vws&&vws.close()}catch(e){}
+let vws=null,vSub='',vBal={t:null,s:null},vKeys={},vSrc='';
+// Program ids of concentrated-liquidity pools (price decoded from pool state, not from vault balances)
+const CLMM={'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc':'Orca','CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK':'Raydium CLMM','LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo':'Meteora DLMM'};
+const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function b58(u){let n=0n;for(const b of u)n=n*256n+BigInt(b);let o='';while(n>0n){o=B58[Number(n%58n)]+o;n/=58n}for(const b of u){if(b===0)o='1'+o;else break}return o}
+const u8=a=>Uint8Array.from(atob(a),c=>c.charCodeAt(0));
+const u128=(d,o)=>{const v=new DataView(d.buffer,d.byteOffset);return (v.getBigUint64(o+8,true)<<64n)|v.getBigUint64(o,true)};
+// SOL per 1 quote token, from DexScreener (USDC/stock rate moves slowly). SOL quote = 1.
+const qConv=()=>{const pn=+pair.priceNative||0;return pn&&dsSol?dsSol/pn:0};
+function pushLive(pq,src){const c=qConv();if(!(pq>0)||!c)return;vSrc=src;livePx.unshift({p:pq*c,at:Date.now(),bt:Date.now(),src:'ws'});livePx=livePx.slice(0,300);applyLive();if(tab==='live')drawPane()}
+const rpcJ=async(mt,pr)=>(await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})})).json();
+async function vaultSub(){try{if(!pair||!rc||!rc.markets)return;const k=rpcUrls();if(!k.ws.includes('helius'))return;
+ const key=pair.pairAddress;if(vSub===key&&vws&&vws.readyState<2)return;vSub=key;try{vws&&vws.close()}catch(e){}
+ const ai=(await rpcJ('getAccountInfo',[pair.pairAddress,{encoding:'base64'}])).result;const owner=ai&&ai.value&&ai.value.owner,kind=CLMM[owner];
+ let subs=[],onData=null;
+ if(kind){ // ---- concentrated pool: decode price from pool account ----
+  const d=u8(ai.value.data[0]);let mA,mB;
+  if(kind==='Orca'){mA=b58(d.slice(101,133));mB=b58(d.slice(181,213))}
+  else if(kind==='Raydium CLMM'){mA=b58(d.slice(73,105));mB=b58(d.slice(105,137))}
+  else {mA=b58(d.slice(88,120));mB=b58(d.slice(120,152))}
+  if(mA!==ca&&mB!==ca)return;const ms=(await rpcJ('getMultipleAccounts',[[mA,mB],{encoding:'jsonParsed'}])).result.value;const dA=ms[0].data.parsed.info.decimals,dB=ms[1].data.parsed.info.decimals;
+  const price=dd=>{let pAB; // tokenB per tokenA, human units
+   if(kind==='Meteora DLMM'){const v=new DataView(dd.buffer,dd.byteOffset);const id=v.getInt32(76,true),bs=v.getUint16(80,true);pAB=Math.pow(1+bs/1e4,id)*Math.pow(10,dA-dB)}
+   else{const sp=Number(u128(dd,kind==='Orca'?65:253))/2**64;pAB=sp*sp*Math.pow(10,dA-dB)}
+   return mA===ca?pAB:1/pAB};
+  pushLive(price(d),kind);subs=[[pair.pairAddress,'base64']];onData=(w,val)=>pushLive(price(u8(val.data[0])),kind);
+ } else { // ---- simple pool: quote vault ÷ base vault (any quote token: SOL, USDC, stock) ----
+  const mk=rc.markets.find(x=>x.pubkey===pair.pairAddress);if(!mk||!mk.liquidityA||!mk.liquidityB)return;
+  const baseIsA=mk.mintA===ca,tv=baseIsA?mk.liquidityA:mk.liquidityB,sv=baseIsA?mk.liquidityB:mk.liquidityA;vBal={t:null,s:null};
+  subs=[[tv,'jsonParsed','t'],[sv,'jsonParsed','s']];
+  onData=(w,val)=>{vBal[w]=+val.data.parsed.info.tokenAmount.uiAmount;if(vBal.t>0&&vBal.s>0)pushLive(vBal.s/vBal.t,(pair.quoteToken||{}).symbol==='SOL'?'pool':'pool ('+(pair.quoteToken||{}).symbol+')')};
+ }
  vws=new WebSocket(k.ws);vKeys={};
- vws.onopen=()=>{[tv,sv].forEach((a,i)=>vws.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:'accountSubscribe',params:[a,{encoding:'jsonParsed',commitment:'processed'}]})))};
- vws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id&&m.result!=null){vKeys[m.result]=m.id===1?'t':'s';return}
-  if(m.method==='accountNotification'){const w=vKeys[m.params.subscription],info=m.params.result.value.data.parsed.info;vBal[w]=+info.tokenAmount.uiAmount;
-   if(vBal.t>0&&vBal.s>0){livePx.unshift({p:vBal.s/vBal.t,at:Date.now(),bt:Date.now(),src:'ws'});livePx=livePx.slice(0,300);applyLive();if(tab==='live')drawPane()}}};
+ vws.onopen=()=>subs.forEach((x,i)=>vws.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:'accountSubscribe',params:[x[0],{encoding:x[1],commitment:'processed'}]})));
+ vws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id&&m.result!=null){vKeys[m.result]=(subs[m.id-1]||[])[2]||'p';return}
+  if(m.method==='accountNotification'){try{onData(vKeys[m.params.subscription],m.params.result.value)}catch(x){}}};
  vws.onclose=()=>{vSub='';setTimeout(vaultSub,2000)};}catch(e){}}
 const WSM='So11111111111111111111111111111111111111112';
 const HK='papertrade_helius';let trades=[],ws=null,seen=new Set(),q=[],busy=false;
@@ -202,7 +227,7 @@ async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST
  // pool price from the pool's own balances after this tx (= what Axiom shows). Owner holding the most of this token AND some SOL = the pool.
  {const own={};(tx.meta.postTokenBalances||[]).forEach(b=>{if(b.owner===signer)return;const o=own[b.owner]||(own[b.owner]={t:0,s:0});if(b.mint===ca)o.t+=(+b.uiTokenAmount.uiAmount||0);else if(b.mint===WS)o.s+=(+b.uiTokenAmount.uiAmount||0)});
   const pool=Object.values(own).filter(o=>o.t>0&&o.s>0).sort((a,b)=>b.t-a.t)[0];
-  if(pool&&!(vws&&vws.readyState===1&&vBal.t>0)){livePx.unshift({p:pool.s/pool.t,at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}}if(trades.length>100)trades.pop();
+  if(pool&&!(vws&&vws.readyState===1&&livePx.some(x=>x.src==='ws'))){livePx.unshift({p:pool.s/pool.t,at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}}if(trades.length>100)trades.pop();
  if(tab==='live')drawPane()}catch(e){}}
 $('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
 $('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
