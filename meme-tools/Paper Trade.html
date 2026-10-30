@@ -98,7 +98,7 @@ async function refresh(first){
  dsSol=priceSol;dsUsd=priceUsd;applyLive();
  draw();
 }
-async function loadRC(){ rc=await f('https://api.rugcheck.xyz/v1/tokens/'+ca+'/report'); drawSec(); if(tab==='hold')drawPane() }
+async function loadRC(){ rc=await f('https://api.rugcheck.xyz/v1/tokens/'+ca+'/report'); drawSec(); if(tab==='hold')drawPane(); vaultSub() }
 function drawSec(){
  if(!rc){$('#sec').innerHTML='<div class="muted" style="grid-column:1/4">RugCheck unavailable</div>';return}
  const _ka=(rc&&rc.knownAccounts)||{},_pool=new Set();((rc&&rc.markets)||[]).forEach(x=>[x.liquidityA,x.liquidityB,x.pubkey,x.liquidityAAccount,x.liquidityBAccount].forEach(a=>a&&_pool.add(a)));const isPool=h=>_pool.has(h.address)||_pool.has(h.owner)||/AMM/i.test(((_ka[h.owner]||_ka[h.address]||{}).type)||'');const realH=((rc&&rc.topHolders)||[]).filter(h=>!isPool(h));const top10=realH.slice(0,10).reduce((s,h)=>s+(h.pct||0),0), lp=(()=>{const mk=(rc.markets||[]).map(x=>x.lp||{}),tot=mk.reduce((t,l)=>t+(l.quoteUSD||0)+(l.baseUSD||0),0),lk=mk.reduce((t,l)=>t+(l.lpLockedUSD||0),0);return tot>0?lk/tot*100:Math.max(0,...mk.map(l=>l.lpLockedPct||0))})();
@@ -146,12 +146,26 @@ function drawPane(){const el=$('#pane');
 // ===== LIVE on-chain price (fixes DexScreener's 20-40s delay) =====
 // Uses the median of the last 3 exactly-parsed on-chain trades if the newest is <15s old; else DexScreener.
 let dsSol=0,dsUsd=0,livePx=[];
-function applyLive(){const fresh=livePx.filter(x=>Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
- if(fresh.length&&dsSol){const r=fresh.slice(0,3).map(x=>x.p).sort((a,b)=>a-b),med=r[Math.floor(r.length/2)];
+function applyLive(){const wsOn=vws&&vws.readyState===1&&vBal.t>0;const fresh=livePx.filter(x=>wsOn?x.src==='ws'&&Date.now()-x.at<120000:Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
+ if(fresh.length&&dsSol){const r=fresh.slice(0,wsOn?1:3).map(x=>x.p).sort((a,b)=>a-b),med=r[Math.floor(r.length/2)];
   if(med>dsSol*0.33&&med<dsSol*3){priceSol=med;priceUsd=solUsd?med*solUsd:dsUsd*med/dsSol;if(vl)vl.textContent='$'+(priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4));
-   if(el){const lag=Math.round((Date.now()-fresh[0].bt)/1000);el.innerHTML='<b class="up">⚡ live on-chain</b> · last trade '+lag+'s ago'}return true}}
+   if(el){const lag=Math.round((Date.now()-fresh[0].bt)/1000);el.innerHTML='<b class="up">⚡ live on-chain</b> · '+(fresh[0].src==='ws'?'websocket (instant)':'last trade '+lag+'s ago')}return true}}
  if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — no fresh on-chain trade';return false}
 setInterval(()=>{if(pair){applyLive();draw()}},1000);
+// ===== WEBSOCKET pool vaults: Helius pushes every balance change of the pool's SOL + token vaults (no queue, no polling) =====
+let vws=null,vSub='',vBal={t:null,s:null},vKeys={};
+function vaultSub(){try{if(!pair||!rc||!rc.markets)return;const k=rpcUrls();if(!k.ws.includes('helius'))return;
+ const mk=rc.markets.find(x=>x.pubkey===pair.pairAddress);if(!mk||!mk.liquidityA||!mk.liquidityB)return;
+ const baseIsA=mk.mintA===ca,tv=baseIsA?mk.liquidityA:mk.liquidityB,sv=baseIsA?mk.liquidityB:mk.liquidityA,sm=baseIsA?mk.mintB:mk.mintA;
+ if(sm!==WSM)return; // only SOL-paired pools
+ const key=tv+sv;if(vSub===key&&vws&&vws.readyState<2)return;vSub=key;try{vws&&vws.close()}catch(e){}
+ vws=new WebSocket(k.ws);vKeys={};
+ vws.onopen=()=>{[tv,sv].forEach((a,i)=>vws.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:'accountSubscribe',params:[a,{encoding:'jsonParsed',commitment:'processed'}]})))};
+ vws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id&&m.result!=null){vKeys[m.result]=m.id===1?'t':'s';return}
+  if(m.method==='accountNotification'){const w=vKeys[m.params.subscription],info=m.params.result.value.data.parsed.info;vBal[w]=+info.tokenAmount.uiAmount;
+   if(vBal.t>0&&vBal.s>0){livePx.unshift({p:vBal.s/vBal.t,at:Date.now(),bt:Date.now(),src:'ws'});livePx=livePx.slice(0,300);applyLive();if(tab==='live')drawPane()}}};
+ vws.onclose=()=>{vSub='';setTimeout(vaultSub,2000)};}catch(e){}}
+const WSM='So11111111111111111111111111111111111111112';
 const HK='papertrade_helius';let trades=[],ws=null,seen=new Set(),q=[],busy=false;
 function rpcUrls(){let k='';try{k=localStorage.getItem(HK)||''}catch(e){}
  k=k.trim();if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k))k='';
@@ -167,7 +181,7 @@ function startPoll(){if(polling)return;try{ws&&(ws.onclose=null,ws.close())}catc
   if(r.error){$('#feedSt').innerHTML='<span class="dn">error: '+r.error.message+'</span>';return}
   const sigs=(r.result||[]).filter(x=>!x.err).map(x=>x.signature);const fresh=[];for(const g of sigs){if(g===lastSig)break;fresh.push(g)}
   if(sigs.length)lastSig=sigs[0];fresh.reverse().forEach(g=>{if(!seen.has(g)){seen.add(g);q.push(g)}});pump()}catch(e){$('#feedSt').innerHTML='<span class="dn">rate-limited, retrying…</span>'}},rpcUrls().http.includes('helius')?1000:4000)}
-async function pump(){if(busy)return;busy=true;while(q.length){const sig=q.shift();await parseTx(sig);await new Promise(r=>setTimeout(r,rpcUrls().http.includes('helius')?80:400))}busy=false}
+async function pump(){if(busy)return;busy=true;while(q.length){if(q.length>8)q.splice(0,q.length-8);const sig=q.shift();await parseTx(sig);await new Promise(r=>setTimeout(r,rpcUrls().http.includes('helius')?80:400))}busy=false}
 async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getTransaction',params:[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:1,commitment:'confirmed'}]})}).then(r=>r.json());
  if(r.error){$('#feedSt').innerHTML='<span class="dn">tx error: '+r.error.message+'</span>';return}const tx=r.result;if(!tx)return;const signer=tx.transaction.message.accountKeys[0].pubkey||tx.transaction.message.accountKeys[0];
  const bal=a=>(a||[]).filter(b=>b.mint===ca&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
@@ -182,7 +196,7 @@ async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST
  // pool price from the pool's own balances after this tx (= what Axiom shows). Owner holding the most of this token AND some SOL = the pool.
  {const own={};(tx.meta.postTokenBalances||[]).forEach(b=>{if(b.owner===signer)return;const o=own[b.owner]||(own[b.owner]={t:0,s:0});if(b.mint===ca)o.t+=(+b.uiTokenAmount.uiAmount||0);else if(b.mint===WS)o.s+=(+b.uiTokenAmount.uiAmount||0)});
   const pool=Object.values(own).filter(o=>o.t>0&&o.s>0).sort((a,b)=>b.t-a.t)[0];
-  if(pool){livePx.unshift({p:pool.s/pool.t,at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}}if(trades.length>100)trades.pop();
+  if(pool&&!(vws&&vws.readyState===1&&vBal.t>0)){livePx.unshift({p:pool.s/pool.t,at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}}if(trades.length>100)trades.pop();
  if(tab==='live')drawPane()}catch(e){}}
 $('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
 $('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
