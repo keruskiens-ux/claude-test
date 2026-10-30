@@ -78,7 +78,7 @@ function load(){try{const v=JSON.parse(localStorage.getItem(K));if(v&&typeof v.b
 let st=load();
 // Every change re-reads storage first, so another window's trades are never overwritten.
 function mutate(fn){st=load();const r=fn(st);try{localStorage.setItem(K,JSON.stringify(st))}catch(e){toast('Could not save: '+e.message)}sched(true);return r}
-window.addEventListener('storage',e=>{if(e.key===K){st=load();sched(true)}if(e.key==='pt_unit'){unit=localStorage.getItem('pt_unit')||'mc';sched(true)}});
+window.addEventListener('storage',e=>{if(e.key===K){st=load();try{pickPrice();drawNums();drawPane(true)}catch(x){}}if(e.key==='pt_unit'){unit=localStorage.getItem('pt_unit')||'mc';sched(true)}});
 
 // ---------- display unit toggle (#12) ----------
 let unit=(()=>{try{return localStorage.getItem('pt_unit')||'mc'}catch(e){return 'mc'}})();
@@ -192,11 +192,12 @@ function drawNums(){
  const e=$('#pP');e.textContent=(pnl>=0?'+':'')+pnl.toFixed(3)+(solUsd?' ($'+(pnl*solUsd).toFixed(0)+')':'')+(p&&p.in?` (${(pnl/p.in*100).toFixed(0)}%)`:'');e.className=pnl>=0?'up':'dn';
  // #11 stats
  const ps=$('#pstats');if(!p||!(p.tok>0)){ps.innerHTML='<div class="muted" style="grid-column:1/4">No open position in this coin</div>';return}
- const ent=p.cost/p.tok, entMc=p.cost?p.mcw/p.cost:null, cm=curMC(), fromE=ent?(priceSol/ent-1)*100:0, hi=Math.max(p.hi||0,priceSol), lo=Math.min(p.lo||priceSol,priceSol);
+ // entry = market price you bought at (fees/slippage excluded, they show in PnL): tok=v(1-FEE)/(px(1+SLIP)) => px = cost(1-FEE)/(tok(1+SLIP))
+ const ent=p.cost*(1-FEE)/(p.tok*(1+SLIP)), entMc=p.cost?p.mcw/p.cost:null, cm=curMC(), fromE=ent?(priceSol/ent-1)*100:0, hi=Math.max(p.hi||0,priceSol), lo=Math.min(p.lo||priceSol,priceSol);
  const mins=Math.round((Date.now()-p.t0)/60000),tt=mins<60?mins+'m':Math.floor(mins/60)+'h '+(mins%60)+'m';
  const c3=(l,v,cl='')=>`<div><b class="${cl}">${v}</b><span>${l}</span></div>`;
  ps.innerHTML=c3('Avg entry',showMP(entMc,ent*(solUsd||0)))+c3('Now',showMP(cm,priceUsd))+c3('From entry',(fromE>=0?'+':'')+fromE.toFixed(1)+'%',fromE>=0?'up':'dn')
-  +c3('Max gain',(ent?((hi/ent-1)*100):0).toFixed(1)+'%','up')+c3('Max drawdown',(ent?((lo/ent-1)*100):0).toFixed(1)+'%','dn')+c3('Time in trade',tt);
+  +c3('Max gain',(ent?Math.max(0,(hi/ent-1)*100):0).toFixed(1)+'%','up')+c3('Max drawdown',(ent?Math.min(0,(lo/ent-1)*100):0).toFixed(1)+'%','dn')+c3('Time in trade',tt);
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.p;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));drawPane(true)});
 function realized(){return st.hist.filter(h=>h.side==='SELL'&&h.pnl!=null).reduce((s,h)=>s+h.pnl,0)}
