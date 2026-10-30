@@ -91,7 +91,7 @@ async function one(m){
 const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p.volume||{}).h24||0,avgTr=nTx?vol/nTx:0,hpk=holders&&mc?holders/(mc/1000):0;
  if(!OLD&&hpk>50)add('Fake wallets',1,holders+' holders on only $'+k(mc)+' market cap ('+hpk.toFixed(0)+' per $1K). Real coins don\'t get that many holders that cheap — wallets were farmed to look popular (like BITCAT).');
  if(!OLD&&AGE<24*7&&nTx>3000&&avgTr<35)add('Botted volume',0,'Average trade is only $'+avgTr.toFixed(0)+' across '+k(nTx)+' trades. Bots make tons of tiny buys to fake volume. Check if fees match the market cap.');
- if((t24.buys||0)>50&&!(t24.sells))add('Honeypot',1,(t24.buys)+' buys and ZERO sells in 24h. People can buy but nobody can sell — the contract blocks sells. Never buy.');
+ /* Honeypot flag CUT 2026-10-30: 0 found in 101 new coins; pump.fun/PumpSwap coins can't block sells */
  const ageH=p&&p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/36e5:99;if(ageH<2)add('Brand new (<2h)',0,'Only '+Math.round(ageH*60)+' minutes old. Most rugs happen in the first 1-2 hours. If it survives 2h+ with real holders, rug odds drop a lot.');
  if(p)PAIR[m]={rcH:holders,a:p.pairAddress,mc,nTx,vol,ageH,sol:(+p.priceNative&&+p.priceUsd)?(+p.priceUsd/+p.priceNative):0,q:(p.quoteToken||{}).symbol};
  if(rc&&rc.topHolders)HOLD[m]=rc.topHolders.filter(h=>!(((rc.markets||[]).some(x=>[x.liquidityA,x.liquidityB,x.pubkey].includes(h.address)))||/AMM/i.test((((rc.knownAccounts||{})[h.owner]||{}).type)||''))).slice(0,15).filter(h=>h.owner).map(h=>({o:h.owner,p:h.pct||0}));
@@ -140,14 +140,14 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
   if(sg.length&&sg.length<25){const t=(await rpc('getTransaction',[sg[sg.length-1].signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}])).result;
    if(t){const ks=t.transaction.message.accountKeys.map(a=>a.pubkey||a);let f=null,mx=0;ks.forEach((a,i)=>{const d=t.meta.preBalances[i]-t.meta.postBalances[i];if(a!==h.o&&d>mx){mx=d;f=a}});if(f){(fund[f]=fund[f]||{n:0,p:0});fund[f].n++;fund[f].p+=h.p}}}}catch(e){}})()}));
  const cl=Object.entries(fund).filter(([,v])=>v.n>=3).sort((a,b)=>b[1].p-a[1].p);const out=[];
- if(n&&fresh/n>=.4)out.push(risk('Fresh wallets',0,fresh+' of '+n+' top holders are brand-new wallets (under 10 transactions ever). One person spreading supply across new wallets to look like real buyers, then dumping.'));
+ /* Fresh wallets warning CUT 2026-10-30: called real HELL fake; only fired on HYPERCHAN (already caught by zero tips) */
  cl.forEach(([f,v])=>out.push(risk('Cluster: '+v.n+' wallets, '+v.p.toFixed(1)+'%',v.p>=10,v.n+' top holders were all funded by the same wallet ('+f.slice(0,4)+'…'+f.slice(-4)+'). That\'s a Bubblemaps cluster — likely one person. They hold '+v.p.toFixed(1)+'% together and can dump at once. Over ~10% = skip.')));
  // real holder count (wallets still holding >0) for young coins — RugCheck counts emptied wallets too (2-3x on old coins)
  try{const P0=PAIR[m],hEl=[...document.querySelectorAll('#out .card')].map(c=>c.querySelector('#wc_'+m)?c:null).find(Boolean);
   if(P0&&P0.ageH<720&&P0.rcH!=null&&P0.rcH<80000){const own=new Set();let pg=1,done=false;
    while(!done&&pg<=80){const r=await rpc('getTokenAccounts',{mint:m,limit:1000,page:pg});const ta=(r.result&&r.result.token_accounts)||[];ta.forEach(a=>{if(+a.amount>0)own.add(a.owner)});done=ta.length<1000;pg++}
    if(done){P0.realH=own.size;const card=document.getElementById('rp_'+m)?.closest('.card'),box=card&&card.querySelector('.st[data-t="Holders"] b');if(box)box.innerHTML=k(own.size)+' <span class="muted" style="font-size:10px">(RC '+k(P0.rcH)+')</span>';
-    if(P0.rcH>200&&own.size<P0.rcH*0.2)out.push(risk('Holders dumped',0,'RugCheck lists '+P0.rcH+' holder accounts but only '+own.size+' wallets still hold any. Most "holders" already sold or were farmed wallets that got emptied.'))}}}catch(e){}
+    /* Holders dumped warning CUT 2026-10-30: never fired */}}}catch(e){}
  await tradeCheck(m,rpc,out);
  const bad=cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
  if(bad){const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
@@ -168,12 +168,7 @@ async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
  // Fees box CUT 2026-10-30: could not tell real from fake (real Dacity/CLAUDIA read as low as fakes). Use Axiom Global Fees Paid by hand.
  if(kk>=15&&tipped===0&&(P.noTips=P.ageH<720,true))out.push(risk('No real-trader tips',P.ageH<720,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
  else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips — real traders present</div>');
- // staircase: same buy size over and over, or buys on a timer
- const cnt={};buys.forEach(b=>cnt[b.sz]=(cnt[b.sz]||0)+1);const rep=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
- let timer=false;if(rep&&rep[1]>=4){const ts=buys.filter(b=>String(b.sz)===rep[0]).map(b=>b.t).sort();const g=ts.slice(1).map((x,i)=>x-ts[i]).filter(x=>x>0);if(g.length>=3){const mu=g.reduce((a,b)=>a+b,0)/g.length,sd=Math.sqrt(g.reduce((a,b)=>a+(b-mu)**2,0)/g.length);timer=sd/mu<0.35}}
- const topW=Object.values(wal).sort((a,b)=>b-a)[0]||0;
- if(P.ageH<720&&rep&&buys.length>=6&&(rep[1]>=Math.max(4,buys.length*.4)||(rep[1]>=4&&timer)))out.push(risk('Staircase bot pattern',0,rep[1]+' of the last '+buys.length+' buys were the exact same size (~'+k_(+rep[0])+' tokens)'+(timer?', spaced on a timer':'')+'. That is a bot drawing a fake "staircase" chart.'));
- else if(P.ageH<720&&buys.length>=6&&topW>=buys.length*.6)out.push(risk('One wallet buying',0,topW+' of the last '+buys.length+' buys came from ONE wallet. Looks like volume, but it is one bot.'));
+ // Staircase + one-wallet checks CUT 2026-10-30: never the only catch; false hits on HELL/MOODENG/GIGA.
 }catch(e){}}
 const k_=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n;
 async function wpump(){if(wbusy>=3||!wq.length)return;wbusy++;await walletCheck(wq.shift());wbusy--;wpump()}
