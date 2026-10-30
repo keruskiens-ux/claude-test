@@ -265,7 +265,7 @@ async function connect(){
  if(!pair)return;const u=rpcUrls();if(!u.key){feed('dn','needs Helius key ↓');live.msg='add a Helius key for live price';sched(false);return}
  try{sock&&(sock.onclose=null,sock.close())}catch(e){}
  // 1) work out the pool type and what to subscribe to
- const ai=await rpc('getAccountInfo',[pair.pairAddress,{encoding:'base64'}]);if(!ai||!ai.value){live.msg='pool account not found';sched(false);return setTimeout(connect,10000)}
+ const ai=await rpc('getAccountInfo',[pair.pairAddress,{encoding:'base64'}]);if(!ai||!ai.value){live.msg=ai===null?'Helius busy or offline (see Live feed box) — retrying in 10s':'pool account not found on-chain';sched(false);return setTimeout(connect,10000)}
  poolKind=PROG[ai.value.owner]||'unknown pool';const d=u8(ai.value.data[0]);let decode=null,acct=[pair.pairAddress],vault=null;
  const qc=()=>{const pn=+pair.priceNative||0;return pn&&dsSol?dsSol/pn:0}; // SOL per quote token (1 for SOL pairs)
  if(poolKind==='pump.fun curve'){decode=dd=>{const vt=Number(u64(dd,8)),vs=Number(u64(dd,16));return vt?(vs/1e9)/(vt/1e6):0}} // virtual reserves
