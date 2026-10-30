@@ -61,8 +61,12 @@ const risk=(name,hard,extra)=>`<span class="risk ${hard?'hard':''}" data-t="${es
 function gauge(score,label,col){const pct=Math.max(4,Math.min(100,score)),c=2*Math.PI*48;
  return `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="#1d2433" stroke-width="10"/><circle cx="60" cy="60" r="48" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c*pct/100} ${c}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${col})"/><text x="60" y="68" text-anchor="middle" fill="${col}" font-size="28" font-weight="800">${score}</text></svg><b style="color:${col}">${label}</b>`}
 async function one(m){
- const [ds,rc]=await Promise.all([f('https://api.dexscreener.com/tokens/v1/solana/'+m),f('https://api.rugcheck.xyz/v1/tokens/'+m+'/report')]);
- const p=(ds||[]).sort((a,b)=>((b.liquidity||{}).usd||0)-((a.liquidity||{}).usd||0))[0];
+ const [ds0,ds1,rc]=await Promise.all([f('https://api.dexscreener.com/token-pairs/v1/solana/'+m),f('https://api.dexscreener.com/tokens/v1/solana/'+m),f('https://api.rugcheck.xyz/v1/tokens/'+m+'/report')]);
+ const seenP=new Set(),ds=[...(ds0||[]),...(ds1||[])].filter(x=>x&&x.pairAddress&&!seenP.has(x.pairAddress)&&seenP.add(x.pairAddress));
+ const p0=ds.sort((a,b)=>((b.liquidity||{}).usd||0)-((a.liquidity||{}).usd||0))[0];
+ // main pair for price/age/socials, but liquidity, volume and trade counts summed across ALL pools (fixes WIF/BONK reading tiny)
+ const p=p0?{...p0,info:p0.info||(ds.find(x=>x.info)||{}).info,liquidity:{usd:ds.reduce((t,x)=>t+((x.liquidity||{}).usd||0),0)},volume:{h24:ds.reduce((t,x)=>t+((x.volume||{}).h24||0),0)},txns:{h24:{buys:ds.reduce((t,x)=>t+(((x.txns||{}).h24||{}).buys||0),0),sells:ds.reduce((t,x)=>t+(((x.txns||{}).h24||{}).sells||0),0)}},pairCreatedAt:Math.min(...ds.map(x=>x.pairCreatedAt||Infinity))}:null;
+ if(p&&!isFinite(p.pairCreatedAt))p.pairCreatedAt=p0.pairCreatedAt;
  const risks=[],names=[];let hard=0,soft=0;const add=(n,h,x)=>{risks.push(risk(n,h,x));names.push((h?'⛔ ':'⚠️ ')+n);h?hard++:soft++};
  const liq=p?(p.liquidity||{}).usd||0:0,mc=p?(p.marketCap||p.fdv||0):0;
  const AGE=p&&p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/36e5:0,OLD=AGE>24*30;
@@ -77,7 +81,7 @@ async function one(m){
   if(single>20)add('Single big holder',0,'Largest wallet holds '+single.toFixed(1)+'%. '+L['Single big holder']);
   const insR=holders?ins/holders*100:0;if(ins>R.maxIns&&!(OLD||insR<0.5))add('Insider networks',insR>2&&ins>15,ins+' insider networks found. '+L['Insider networks']);
   if(tax>0)add('Transfer tax',tax>5,tax+'% tax. '+L['Transfer tax']);
-  if(rc.tokenMeta&&rc.tokenMeta.mutable)add('Mutable metadata',0);
+  if(rc.tokenMeta&&rc.tokenMeta.mutable&&!OLD)add('Mutable metadata',0);
   if(cb>5)add('Dev still holding',0,'Creator holds '+cb.toFixed(1)+'%. '+L['Dev still holding']);
   (rc.risks||[]).filter(x=>x.level==='danger'&&!/LP|Mint|Freeze|holder|Top 10|insider|liquidity/i.test(x.name)).forEach(x=>add(x.name,0,x.description));
  } else add('RugCheck unavailable',0,'Couldn\'t load RugCheck (rate limit or new coin). Open RC manually.');
