@@ -184,11 +184,14 @@ async function vaultSub(){try{if(!pair||!rc||!rc.markets)return;const k=rpcUrls(
    if(kind==='Meteora DLMM'){const v=new DataView(dd.buffer,dd.byteOffset);const id=v.getInt32(76,true),bs=v.getUint16(80,true);pAB=Math.pow(1+bs/1e4,id)*Math.pow(10,dA-dB)}
    else{const sp=Number(u128(dd,kind==='Orca'?65:253))/2**64;pAB=sp*sp*Math.pow(10,dA-dB)}
    return mA===ca?pAB:1/pAB};
-  pushLive(price(d),kind);subs=[[pair.pairAddress,'base64']];onData=(w,val)=>pushLive(price(u8(val.data[0])),kind);
+  pushLive(price(d),kind);subs=[[pair.pairAddress,'base64']];
+  // fast calibration: 4 more direct reads, 1s apart (quiet pools may not change for minutes)
+  (async()=>{for(let i=0;i<4;i++){await new Promise(r=>setTimeout(r,1000));try{const a2=(await rpcJ('getAccountInfo',[pair.pairAddress,{encoding:'base64'}])).result;if(a2&&a2.value)pushLive(price(u8(a2.value.data[0])),kind)}catch(e){}}})();onData=(w,val)=>pushLive(price(u8(val.data[0])),kind);
  } else { // ---- simple pool: quote vault ÷ base vault (any quote token: SOL, USDC, stock) ----
   const mk=rc.markets.find(x=>x.pubkey===pair.pairAddress);if(!mk||!mk.liquidityA||!mk.liquidityB)return;
   const baseIsA=mk.mintA===ca,tv=baseIsA?mk.liquidityA:mk.liquidityB,sv=baseIsA?mk.liquidityB:mk.liquidityA;vBal={t:null,s:null};
   subs=[[tv,'jsonParsed','t'],[sv,'jsonParsed','s']];
+  (async()=>{for(let i=0;i<5;i++){try{const r=(await rpcJ('getMultipleAccounts',[[tv,sv],{encoding:'jsonParsed'}])).result.value;vBal.t=+r[0].data.parsed.info.tokenAmount.uiAmount;vBal.s=+r[1].data.parsed.info.tokenAmount.uiAmount;if(vBal.t>0&&vBal.s>0)pushLive(vBal.s/vBal.t,(pair.quoteToken||{}).symbol==='SOL'?'pool':'pool ('+(pair.quoteToken||{}).symbol+')')}catch(e){}await new Promise(r=>setTimeout(r,1000))}})();
   onData=(w,val)=>{vBal[w]=+val.data.parsed.info.tokenAmount.uiAmount;if(vBal.t>0&&vBal.s>0)pushLive(vBal.s/vBal.t,(pair.quoteToken||{}).symbol==='SOL'?'pool':'pool ('+(pair.quoteToken||{}).symbol+')')};
  }
  vws=new WebSocket(k.ws);vKeys={};
