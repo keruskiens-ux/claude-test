@@ -173,7 +173,15 @@ $('#tr').onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling trendi
 $('#hx').onclick=()=>{let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){}const c='time,ca,symbol,mcap,liq,holders,top10,insiders,rug,entry,flags\n'+h.map(x=>[new Date(x.t).toISOString(),x.ca,x.sym,x.mc,x.liq,x.holders,x.top10,x.ins,x.rug,x.entry,'"'+(x.flags||'')+'"'].join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='scan_history.csv';a.click()};
 document.querySelectorAll('.pf').forEach(b=>b.onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling from pump.fun…</div>';
  const r=await f('https://frontend-api-v3.pump.fun/coins?offset=0&limit=20&'+b.dataset.q);
- if(!r||!r.length){$('#out').innerHTML='<div class="load">pump.fun blocked it — using GeckoTerminal new coins instead…</div>';document.querySelector('.gk[data-u="new_pools"]').click();return}
+ if(!r||!r.length){$('#out').innerHTML='<div class="load">pump.fun blocks web pages — pulling the same list from GeckoTerminal…</div>';
+  // each Pump button gets its OWN GeckoTerminal source (before: all 3 silently showed Gecko New)
+  const G=u=>f('https://api.geckoterminal.com/api/v2/networks/solana/'+u),mode=/created/.test(b.dataset.q)?'new':/complete=false/.test(b.dataset.q)?'final':'mig';
+  let pools=[];if(mode==='new'){for(const pg of [1,2,3]){const j=await G('new_pools?page='+pg);pools.push(...((j&&j.data)||[]).filter(x=>x.relationships.dex.data.id==='pump-fun'))}}
+  else if(mode==='final'){for(const pg of [1,2]){const j=await G('dexes/pump-fun/pools?sort=h24_volume_usd_desc&page='+pg);pools.push(...((j&&j.data)||[]))}pools=pools.filter(x=>{const v=+x.attributes.fdv_usd;return v>=30000&&v<=100000}).sort((x,y)=>y.attributes.fdv_usd-x.attributes.fdv_usd)}
+  else{for(const pg of [1,2]){const j=await G('dexes/pumpswap/pools?sort=h24_volume_usd_desc&page='+pg);pools.push(...((j&&j.data)||[]))}const fr=pools.filter(x=>Date.now()-Date.parse(x.attributes.pool_created_at)<48*36e5);if(fr.length>=5)pools=fr}
+  const ms=[];for(const x of pools){const a=((x.relationships.base_token||{}).data||{}).id;const c=a&&a.replace('solana_','');if(c&&!ms.includes(c)&&!c.startsWith('So111'))ms.push(c)}
+  if(!ms.length){$('#out').innerHTML='<div class="load">No coins from GeckoTerminal right now (rate limit?). Try again in a minute.</div>';return}
+  $('#in').value=ms.slice(0,20).join('\n');go();return}
  $('#in').value=r.map(c=>c.mint).join('\n');go()});
 document.querySelectorAll('.gk').forEach(b=>b.onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling from GeckoTerminal…</div>';
  const r=await f('https://api.geckoterminal.com/api/v2/networks/solana/'+b.dataset.u);const ms=[];
