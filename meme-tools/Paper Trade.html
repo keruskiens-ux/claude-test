@@ -179,7 +179,10 @@ async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST
  // routed/ stock-paired trades: if parsed SOL is way off the live price, show the price-based estimate (marked ~)
  if(est&&(dSol<est*0.5||dSol>est*2)){dSol=est;approx=true}
  trades.unshift({t:(tx.blockTime||Date.now()/1000)*1000,side:dTok>0?'BUY':'SELL',tok:Math.abs(dTok),sol:dSol,approx,w:signer,sig});
- if(!approx&&dSol>0.0005){livePx.unshift({p:dSol/Math.abs(dTok),at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}if(trades.length>100)trades.pop();
+ // pool price from the pool's own balances after this tx (= what Axiom shows). Owner holding the most of this token AND some SOL = the pool.
+ {const own={};(tx.meta.postTokenBalances||[]).forEach(b=>{if(b.owner===signer)return;const o=own[b.owner]||(own[b.owner]={t:0,s:0});if(b.mint===ca)o.t+=(+b.uiTokenAmount.uiAmount||0);else if(b.mint===WS)o.s+=(+b.uiTokenAmount.uiAmount||0)});
+  const pool=Object.values(own).filter(o=>o.t>0&&o.s>0).sort((a,b)=>b.t-a.t)[0];
+  if(pool){livePx.unshift({p:pool.s/pool.t,at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}}if(trades.length>100)trades.pop();
  if(tab==='live')drawPane()}catch(e){}}
 $('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
 $('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
