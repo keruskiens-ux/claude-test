@@ -99,9 +99,9 @@ async function one(m){
   (rc.risks||[]).filter(x=>x.level==='danger'&&!/LP|Mint|Freeze|holder|Top 10|insider|liquidity/i.test(x.name)).forEach(x=>add(x.name,0,x.description));
  } else add('RugCheck unavailable',0,'Couldn\'t load RugCheck (rate limit or new coin). Open RC manually.');
 // ---- vamp / copycat check: same ticker or name on another Solana coin ----
- let vampNote='';if(p){const sym=(p.baseToken.symbol||'').replace(/^\$/,'').toLowerCase(),nm=(p.baseToken.name||'').toLowerCase();
+ let vampNote='';if(p){const norm=v=>(v||'').toLowerCase().replace(/[^a-z0-9]/g,''),sym=norm(p.baseToken.symbol),nm=norm(p.baseToken.name); // letters/numbers only: 'Pnut ' = 'PNUT' = '$pnut'
   const sr=await f('https://api.dexscreener.com/latest/dex/search?q='+encodeURIComponent(sym));const by={};
-  for(const x of ((sr&&sr.pairs)||[])){if(x.chainId!=='solana'||!x.baseToken||x.baseToken.address===m)continue;const s2=(x.baseToken.symbol||'').replace(/^\$/,'').toLowerCase(),n2=(x.baseToken.name||'').toLowerCase();if(s2!==sym&&n2!==nm)continue;
+  for(const x of ((sr&&sr.pairs)||[])){if(x.chainId!=='solana'||!x.baseToken||x.baseToken.address===m)continue;if(norm(x.baseToken.symbol)!==sym&&norm(x.baseToken.name)!==nm)continue;
    const a=x.baseToken.address,o=by[a]||(by[a]={a,mc:0,liq:0,born:Infinity});o.mc=Math.max(o.mc,x.marketCap||x.fdv||0);o.liq+=((x.liquidity||{}).usd||0);o.born=Math.min(o.born,x.pairCreatedAt||Infinity)}
   const others=Object.values(by).filter(o=>o.liq>=1000),myBorn=p.pairCreatedAt||Date.now(),orig=others.filter(o=>o.born<myBorn-864e5&&o.mc>=Math.max(1e5,mc*0.1)).sort((a,b)=>b.mc-a.mc)[0]; // an OLDER coin with this ticker that is still substantial = the likely original (copies can fake a bigger MC, e.g. MICHI/PNUT copies)
   if(orig){const ageD=(Date.now()-orig.born)/864e5,classic=(Date.now()-myBorn)/36e5<72&&orig.mc>=mc*0.3;
