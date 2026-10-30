@@ -58,7 +58,7 @@ const L={
  'Single big holder':'One wallet owns a huge % of supply. One click from them can crash the chart.'};
 const MUT=rc=>!!(rc&&rc.tokenMeta&&(rc.tokenMeta.mutable||(rc.tokenMeta.updateAuthority&&!/^1{20,}/.test(rc.tokenMeta.updateAuthority))));
 const SUMD={};
-function summary(d){const r=d.reasons,two=r.slice(0,2).join(' and ');
+function summary(d){const r=[...new Set(d.reasons)],two=r.slice(0,2).join(' and ');
  if(d.v==='AVOID')return 'Danger: '+two+' — likely fake or a rug. Don\'t trade it.';
  const t=d.en==='LATE'?' It already pumped hard — don\'t chase.':d.en==='FALLING'?' Price is falling right now — wait.':'';
  if(d.v==='RISKY')return 'Caution: '+two+'.'+t+(t?'':' Small size only, check Bubblemaps first.');
@@ -167,7 +167,7 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
  const bad=cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
  if(bad){const rp=document.getElementById('rp_'+m);if(rp){const tp=rp.closest('.card').querySelectorAll('.pill')[1];if(tp){tp.className='pill AVOID risk';tp.style.cssText='margin:0;background:none;border:1px solid currentColor';tp.textContent='⛔ DON\'T TRADE';tp.dataset.t='Entry timing: DON\'T TRADE';tp.dataset.x='The deep check found fake activity. Timing doesn\'t matter — skip it.'}rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
  const wStr=cl.length?cl.map(([,v])=>v.n+'-wallet cluster '+v.p.toFixed(1)+'%').join(', '):'clean ('+fresh+'/'+n+' fresh, no clusters)';
- try{const d=SUMD[m];if(d){const inc=PAIR[m]&&/FAILED/.test(PAIR[m].tipStr||'');if(inc&&!bad){d.reasons.unshift('the deep check could not finish (re-scan it)');if(d.v==='PASS'){d.v='RISKY';const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill RISKY risk';rp.textContent='🛡 RISKY'}}}if(bad){d.v='AVOID';if(PAIR[m]&&PAIR[m].noTips)d.reasons.unshift('no real trader paid a tip in the last '+((PAIR[m].fees||{}).kk||'15+')+' trades');cl.filter(([,v])=>v.p>=10).forEach(([,v])=>d.reasons.unshift(v.n+' linked wallets hold '+v.p.toFixed(0)+'%'))}const se=document.getElementById('sum_'+m);if(se){se.textContent=summary(d);se.className='sum '+d.v}}
+ try{const d=SUMD[m];if(d){const inc=PAIR[m]&&/FAILED/.test(PAIR[m].tipStr||'');if(inc&&!bad){d.reasons.unshift('the deep check could not finish (re-scan it)');if(d.v==='PASS'){d.v='RISKY';const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill RISKY risk';rp.textContent='🛡 RISKY'}}}if(bad){d.v='AVOID';if(PAIR[m]&&PAIR[m].noTips)d.reasons.unshift('almost no real traders tip ('+(PAIR[m].tipStr||'')+')');cl.filter(([,v])=>v.p>=10).forEach(([,v])=>d.reasons.unshift(v.n+' linked wallets hold '+v.p.toFixed(0)+'%'))}const se=document.getElementById('sum_'+m);if(se){se.textContent=summary(d);se.className='sum '+d.v}}
   const c=JSON.parse(localStorage.getItem('qs_card_'+m)||'{}');c.tips=(PAIR[m]&&PAIR[m].tipStr)||'n/a';c.wallet=wStr;if(bad)c.rug='RUG RISK';c.t=Date.now();localStorage.setItem('qs_card_'+m,JSON.stringify(c))}catch(e){}
  el.outerHTML=out.length?out.join(''):'<div><span class="clean">🔍 Wallet map looks clean</span> <span class="muted">('+fresh+'/'+n+' fresh, no clusters)</span></div>'}
 const JITO=new Set(['96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5','HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe','Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY','ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49','DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh','ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt','DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL','3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT']);
@@ -186,8 +186,8 @@ async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
   if(dT!==0)tradeFees.push((prio+tip)/1e9);if(dT>0){buys.push({sz:+dT.toPrecision(2),t:t.blockTime||0});wal[signer]=(wal[signer]||0)+1}}
  const kk=tx.length,tf=tradeFees.sort((a,b)=>a-b),med=tf.length?tf[Math.floor(tf.length/2)]:0;P.fees={avg:med,kk,n:tf.length};P.tipStr=kk>=15?tipped+'/'+kk+' recent trades tipped':'too few trades to judge ('+kk+')';if(kk<15&&P.nTx>=200){P.tipStr='tip check FAILED (could only load '+kk+' trades — Helius limit)';out.push(risk('Deep check incomplete',0,'Could only load '+kk+' of the recent trades (Helius rate limit), so the tip check could not run. Re-scan this coin alone before trusting it.'))}
  // Fees box CUT 2026-10-30: could not tell real from fake (real Dacity/CLAUDIA read as low as fakes). Use Axiom Global Fees Paid by hand.
- if(kk>=15&&tipped===0&&(P.noTips=P.ageH<720,true))out.push(risk('No real-trader tips',P.ageH<720,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
- else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips — real traders present</div>');
+ if(kk>=15&&tipped/kk<0.05&&(P.noTips=P.ageH<720,true))out.push(risk('No real-trader tips',P.ageH<720,'Only '+tipped+' of the last '+kk+' trades paid a priority fee or tip (under 5%; lowest real coin tested: Kimchi 12%). Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
+ else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips ('+Math.round(tipped/kk*100)+'%) — real traders present</div>');
  // Staircase + one-wallet checks CUT 2026-10-30: never the only catch; false hits on HELL/MOODENG/GIGA.
 }catch(e){}}
 const k_=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n;
