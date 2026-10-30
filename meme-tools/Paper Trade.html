@@ -244,7 +244,8 @@ let backoff=0,stats={req:0,r429:0,err:0};
 async function rpc(mt,pr){if(backoff>Date.now())await sleep(backoff-Date.now());stats.req++;
  let r;try{r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})})}catch(e){stats.err++;feed('dn','network error: '+e.message);return null}
  if(r.status===429){stats.r429++;const n=(rpc.n=(rpc.n||0)+1);backoff=Date.now()+Math.min(30000,1000*2**Math.min(n,5))+Math.random()*1000;feed('dn','rate-limited (429) — backing off '+Math.round((backoff-Date.now())/1000)+'s');return null}
- rpc.n=0;if(!r.ok){stats.err++;feed('dn','HTTP '+r.status);return null}const j=await r.json();if(j.error){stats.err++;feed('dn','RPC error: '+j.error.message);return null}return j.result}
+ rpc.n=0;if(!r.ok){stats.err++;feed('dn','HTTP '+r.status);return null}const j=await r.json();if(j.error){stats.err++;feed('dn','RPC error: '+j.error.message);return null}
+ if(sock&&sock.readyState===1&&!/● live/.test(($('#feedSt')||{}).textContent||''))feed('up','● live (websocket)');return j.result}
 function feed(cls,msg){const e=$('#feedSt');if(e)e.innerHTML='<span class="'+cls+'">'+msg+'</span>'}
 
 let sock=null,subMap={},pendingSubs=[],poolKind='',calib={r:[],ok:null,next:0},spike=null,reconnects=0;
@@ -304,7 +305,7 @@ async function pump(){if(busy)return;busy=true;while(q.length){const sig=q.pop()
 function startPoll(){if(polling)return;polling=setInterval(async()=>{if(sock&&sock.readyState===1)return stopPoll();const r=await rpc('getSignaturesForAddress',[pair.pairAddress,{limit:10}]);if(!r)return;
  const sigs=r.filter(x=>!x.err).map(x=>x.signature);for(const g of sigs.slice(0,4).reverse())enqueue(g)},4000+Math.random()*1000)}
 function stopPoll(){if(polling){clearInterval(polling);polling=null}}
-async function parseTx(sig){const tx=await rpc('getTransaction',[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:0,commitment:'confirmed'}]);if(!tx)return;
+async function parseTx(sig){const tx=await rpc('getTransaction',[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:1,commitment:'confirmed'}]);if(!tx)return;
  try{const signer=tx.transaction.message.accountKeys[0].pubkey||tx.transaction.message.accountKeys[0];
  const bal=(a,mint)=>(a||[]).filter(b=>b.mint===mint&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
  const dTok=bal(tx.meta.postTokenBalances,ca)-bal(tx.meta.preTokenBalances,ca);if(!dTok)return;
