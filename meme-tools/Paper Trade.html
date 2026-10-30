@@ -266,7 +266,9 @@ function acceptLive(p,src){if(!(p>0))return;const now=Date.now();
  live={p,at:now,src,ok:true,msg:''};pickPrice();sched(false);pushSpark(p)}
 let spark=[];function pushSpark(p){spark.push(p);if(spark.length>150)spark.shift()}
 
-async function connect(){
+let connecting=false;
+async function connect(){if(connecting)return;connecting=true;try{await connect_()}finally{connecting=false}}
+async function connect_(){
  if(!pair)return;const u=rpcUrls();if(!u.key){feed('dn','needs Helius key ↓');live.msg='add a Helius key for live price';sched(false);return}
  try{sock&&(sock.onclose=null,sock.close())}catch(e){}
  // 1) work out the pool type and what to subscribe to
@@ -290,17 +292,17 @@ async function connect(){
   if(!TRUSTED.has(poolKind))(async()=>{for(let i=0;i<4&&calib.ok===null;i++){await sleep(1000);const a2=await rpc('getAccountInfo',[pair.pairAddress,{encoding:'base64'}]);if(a2&&a2.value)acceptLive(decode(u8(a2.value.data[0])),poolKind)}})()}
  else if(vault&&!TRUSTED.has(poolKind))(async()=>{for(let i=0;i<4&&calib.ok===null;i++){await sleep(1000);const r=await rpc('getMultipleAccounts',[acct,{encoding:'jsonParsed'}]);if(r&&r.value[0]&&r.value[1]){vault.t=+r.value[0].data.parsed.info.tokenAmount.uiAmount;vault.s=+r.value[1].data.parsed.info.tokenAmount.uiAmount;if(vault.t>0)acceptLive(vault.s/vault.t*qc(),poolKind)}}})();
  // 2) one websocket: account subs for price + logsSubscribe for the trade feed
- sock=new WebSocket(u.ws);subMap={};const subs=[];
+ const ws=new WebSocket(u.ws);sock=ws;subMap={};const subs=[]; // each connection only uses itself (no cross-talk if a reconnect overlaps)
  acct.forEach((a,i)=>subs.push({m:'accountSubscribe',p:[a,{encoding:decode?'base64':'jsonParsed',commitment:'processed'}],k:decode?'p':(i===0?'t':'s')}));
  subs.push({m:'logsSubscribe',p:[{mentions:[pair.pairAddress]},{commitment:'confirmed'}],k:'logs'});
- sock.onopen=()=>{reconnects=0;subs.forEach((x,i)=>sock.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:x.m,params:x.p})));feed('up','● live (websocket)');stopPoll();sched(false)};
- sock.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}if(m.id&&m.result!=null){subMap[m.result]=subs[m.id-1].k;return}
+ ws.onopen=()=>{reconnects=0;subs.forEach((x,i)=>ws.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:x.m,params:x.p})));feed('up','● live (websocket)');stopPoll();sched(false)};
+ ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}if(m.id&&m.result!=null){subMap[m.result]=subs[m.id-1].k;return}
   if(m.error){feed('dn','websocket error: '+m.error.message);return}
   const k=m.params&&subMap[m.params.subscription];if(!k)return;
   if(m.method==='accountNotification'){const v=m.params.result.value;try{if(decode)acceptLive(decode(u8(v.data[0])),poolKind);else{vault[k]=+v.data.parsed.info.tokenAmount.uiAmount;if(vault.t>0&&vault.s>0)acceptLive(vault.s/vault.t*qc(),poolKind)}}catch(x){}}
   else if(m.method==='logsNotification'){const v=m.params.result.value;if(v&&!v.err)enqueue(v.signature)}};
- sock.onerror=()=>{};
- sock.onclose=()=>{live.ok=false;pickPrice();sched(false);reconnects++;feed('dn','websocket dropped — reconnecting ('+reconnects+')');startPoll();setTimeout(connect,Math.min(30000,2000*reconnects)+Math.random()*1000)};
+ ws.onerror=()=>{};
+ ws.onclose=()=>{if(sock!==ws)return;live.ok=false;pickPrice();sched(false);reconnects++;feed('dn','websocket dropped — reconnecting ('+reconnects+')');startPoll();setTimeout(connect,Math.min(30000,2000*reconnects)+Math.random()*1000)};
 }
 // trade list: parse at most ~2 tx/sec (newest first); polling ONLY while the websocket is down, every 4s (+jitter)
 let trades=[],seen=new Set(),q=[],busy=false,polling=null,lastSig=null;
