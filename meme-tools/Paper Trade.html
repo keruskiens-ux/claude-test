@@ -45,12 +45,14 @@ a{color:#8ab4ff}.lnk{font-size:12px}
    <div class="bs"><button class="buy on" id="tBuy">Buy</button><button class="sell" id="tSell">Sell</button></div>
    <div class="amt"><input id="amt" type="number" step="0.01" min="0" placeholder="0.0"><span id="unit">PAPER SOL</span></div>
    <div class="q" id="quick"></div>
-   <div class="muted" style="margin-top:6px">Sim: <span id="slipTxt"></span> slippage · 1% fee · price = live</div>
-   <button class="go b" id="go">Paper Buy</button>
+   <div class="muted" style="margin-top:6px">Sim: <span id="slipTxt"></span> slippage · 1% fee · fills at the price shown</div>
+   <div id="staleW" class="dn" style="display:none;font-size:11px;margin-top:6px;font-weight:700"></div><button class="go b" id="go">Paper Buy</button>
   </div>
   <div class="box">
    <div class="g4"><div><span>Bought</span><b id="pB">0</b></div><div><span>Sold</span><b id="pS">0</b></div><div><span>Holding</span><b id="pH">0</b></div><div><span>PnL</span><b id="pP">0</b></div></div>
    <div class="muted" style="text-align:center;margin-top:4px">values in SOL</div>
+   <div class="g3" id="pstats" style="margin-top:8px"></div>
+   <div class="row" style="margin-top:6px"><span class="muted">Show entry/now as</span><a href="#" id="unitTog" class="muted">market cap ⇄ price</a></div>
   </div>
   <div class="box"><b>Token Info</b><div class="g3" id="sec" style="margin-top:8px"></div></div>
   <div class="box lnk" id="links"></div>
@@ -59,198 +61,278 @@ a{color:#8ab4ff}.lnk{font-size:12px}
 </main>
 <div id="toast"></div>
 <script>
+// ================= Paper Trade (session 9 rewrite) =================
 const $=s=>document.querySelector(s), ca=new URLSearchParams(location.search).get('ca');
-const K='papertrade_v1', START=10, FEE=0.01, SLIP=0.02;
-let st; try{st=JSON.parse(localStorage.getItem(K))}catch(e){} if(!st) st={bal:START,pos:{},hist:[]};
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(st))}catch(e){}};
-let side='buy', pair=null, rc=null, priceSol=0, priceUsd=0, solUsd=0, tab='live';
-const fmt=(n,d=2)=>n==null?'-':Math.abs(n)>=1e6?(n/1e6).toFixed(1)+'M':Math.abs(n)>=1e3?(n/1e3).toFixed(1)+'K':(+n).toFixed(d);
-const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._);t._=setTimeout(()=>t.style.display='none',2200)};
+const K='papertrade_v1', START=10, FEE=0.01, SLIP=0.02, HK='papertrade_helius', WSM='So11111111111111111111111111111111111111112';
+const fmt=(n,d=2)=>n==null||isNaN(n)?'-':Math.abs(n)>=1e9?(n/1e9).toFixed(2)+'B':Math.abs(n)>=1e6?(n/1e6).toFixed(2)+'M':Math.abs(n)>=1e3?(n/1e3).toFixed(1)+'K':(+n).toFixed(d);
+const usd=n=>n==null||isNaN(n)?'-':'$'+fmt(n);
+const pxs=n=>!n?'-':n<0.01?n.toExponential(3):n.toFixed(4);
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._);t._=setTimeout(()=>t.style.display='none',2500)};
 const f=u=>fetch(u).then(r=>r.ok?r.json():null).catch(()=>null);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 $('#slipTxt').textContent=(SLIP*100)+'%';
+
+// ---------- wallet state: shared by all windows (#8) ----------
+const fresh0=()=>({bal:START,pos:{},hist:[]});
+function load(){try{const v=JSON.parse(localStorage.getItem(K));if(v&&typeof v.bal==='number')return v}catch(e){}return fresh0()}
+let st=load();
+// Every change re-reads storage first, so another window's trades are never overwritten.
+function mutate(fn){st=load();const r=fn(st);try{localStorage.setItem(K,JSON.stringify(st))}catch(e){toast('Could not save: '+e.message)}sched(true);return r}
+window.addEventListener('storage',e=>{if(e.key===K){st=load();sched(true)}if(e.key==='pt_unit'){unit=localStorage.getItem('pt_unit')||'mc';sched(true)}});
+
+// ---------- display unit toggle (#12) ----------
+let unit=(()=>{try{return localStorage.getItem('pt_unit')||'mc'}catch(e){return 'mc'}})();
+$('#unitTog').onclick=e=>{e.preventDefault();unit=unit==='mc'?'price':'mc';try{localStorage.setItem('pt_unit',unit)}catch(x){}sched(true)};
+// show a value captured as {mc, px(usd)} in the chosen unit
+const showMP=(mc,pu)=>unit==='mc'?usd(mc):(pu?'$'+pxs(pu):'-');
+
+// ---------- market data ----------
+let side='buy', pair=null, rc=null, tab='live', solUsd=0, supply=0;
+let dsSol=0, dsUsd=0;           // DexScreener price (slow)
+let live={p:0,at:0,src:'',ok:false}; // live on-chain price (SOL per token)
+let priceSol=0, priceUsd=0;      // price actually used (live if live, else DexScreener)
+const isLive=()=>live.ok&&live.p>0&&sock&&sock.readyState===1;
+const curMC=()=>priceUsd&&supply?priceUsd*supply:null;
 
 if(!ca){const o=document.createElement('div');o.className='empty';o.style.cssText='position:fixed;inset:24px 0 0 0;background:var(--bg);z-index:5';o.innerHTML='<h2>No coin selected</h2><div class="muted">Open this from Quick Scan → Paper Trade, or paste a CA:</div><input id="ci" style="width:420px;padding:8px;background:#0e1118;color:#fff;border:1px solid #333;border-radius:8px"><button class="go b" style="width:200px" id="ciGo">Open</button>';document.body.appendChild(o);$('#ciGo').onclick=()=>{const v=$('#ci').value.trim();if(v)location.search='?ca='+v};$('#hdr').innerHTML='<b>Paper Trade</b>';}
 else init();
 
 async function init(){
  await refresh(true);
- if(pair){
-  $('#chart').src='https://dexscreener.com/solana/'+pair.pairAddress+'?embed=1&theme=dark&info=0&trades=0';
-  $('#links').innerHTML=`<a target=_blank href="https://v2.bubblemaps.io/map?address=${ca}&chain=solana">Bubblemaps</a> · <a target=_blank href="https://rugcheck.xyz/tokens/${ca}">RugCheck</a> · <a target=_blank href="https://solscan.io/token/${ca}">Solscan</a> · <a target=_blank href="https://gmgn.ai/sol/token/${ca}">GMGN</a>`;
- }
- loadRC(); startFeed(); setInterval(refresh,2000); setInterval(loadRC,60000);
+ if(!pair)return;
+ $('#chart').src='https://dexscreener.com/solana/'+pair.pairAddress+'?embed=1&theme=dark&info=0&trades=0';
+ $('#links').innerHTML=`<a target=_blank href="https://v2.bubblemaps.io/map?address=${ca}&chain=solana">Bubblemaps</a> · <a target=_blank href="https://rugcheck.xyz/tokens/${ca}">RugCheck</a> · <a target=_blank href="https://solscan.io/token/${ca}">Solscan</a> · <a target=_blank href="https://gmgn.ai/sol/token/${ca}">GMGN</a>`;
+ loadRC();connect();setInterval(refresh,3000);setInterval(loadRC,60000);setInterval(trackHiLo,1000);
 }
+
+// Header is built ONCE; refresh() only updates DexScreener stats, never the live price (#5)
+function buildHeader(){const q=(pair.quoteToken||{}).symbol||'';
+ $('#hdr').innerHTML=`<span class="n">${pair.baseToken.symbol} <span class="muted">${pair.baseToken.name}</span></span><span class="mc" id="hMc">-</span>
+ <div class="s"><span>Price</span><b id="pxv">-</b><span id="pxs" class="muted" style="font-size:10px">starting…</span></div><div class="s"><span>Liquidity</span><b id="hLiq">-</b></div>
+ <div class="s"><span>Vol 24h</span><b id="hVol">-</b></div><div class="s"><span>5m</span><b id="h5">-</b></div><div class="s"><span>1h</span><b id="h1">-</b></div><div class="s"><span>24h</span><b id="h24">-</b></div>
+ <div class="s"><span>Pair</span><b>${pair.baseToken.symbol}/${q} · ${pair.dexId}</b></div><div class="s"><span>Txns 5m</span><b id="hTx">-</b></div>`}
 async function refresh(first){
  const [d0,d1]=await Promise.all([f('https://api.dexscreener.com/token-pairs/v1/solana/'+ca),f('https://api.dexscreener.com/tokens/v1/solana/'+ca)]);
  const _s=new Set(),d=[...(d0||[]),...(d1||[])].filter(x=>x&&x.pairAddress&&!_s.has(x.pairAddress)&&_s.add(x.pairAddress));
- if(!d||!d.length){ if(first) $('#hdr').innerHTML='<span class="dn">No live pair found for this CA.</span>'; return }
- pair=d.sort((a,b)=>((b.liquidity||{}).usd||0)-((a.liquidity||{}).usd||0))[0];
- priceUsd=+pair.priceUsd||0; const pn=+pair.priceNative||0; const q=(pair.quoteToken||{}).symbol||'';
- if(q==='SOL'||q==='WSOL'){priceSol=pn; solUsd=pn?priceUsd/pn:solUsd}
- else { if(!solUsd){const s=await f('https://api.dexscreener.com/tokens/v1/solana/So11111111111111111111111111111111111111112');const sp=(s||[]).find(p=>p.quoteToken&&/USD/.test(p.quoteToken.symbol));solUsd=sp?+sp.priceUsd:0}
-   priceSol=solUsd?priceUsd/solUsd:0 }
- const ch=pair.priceChange||{}, c=v=>`<b class="${v>=0?'up':'dn'}">${v>=0?'+':''}${v??0}%</b>`;
- $('#hdr').innerHTML=`<span class="n">${pair.baseToken.symbol} <span class="muted">${pair.baseToken.name}</span></span><span class="mc">$${fmt(pair.marketCap||pair.fdv)}</span>
- <div class="s"><span>Price</span><b id="pxv">$${priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4)}</b><span id="pxs" class="muted" style="font-size:10px">DexScreener (~20-40s delay)</span></div><div class="s"><span>Liquidity</span><b>$${fmt((pair.liquidity||{}).usd)}</b></div>
- <div class="s"><span>Vol 24h</span><b>$${fmt((pair.volume||{}).h24)}</b></div><div class="s"><span>5m</span>${c(ch.m5)}</div><div class="s"><span>1h</span>${c(ch.h1)}</div><div class="s"><span>24h</span>${c(ch.h24)}</div>
- <div class="s"><span>Pair</span><b>${pair.baseToken.symbol}/${q}</b></div><div class="s"><span>Txns 5m</span><b><span class="up">${(pair.txns&&pair.txns.m5||{}).buys||0}</span>/<span class="dn">${(pair.txns&&pair.txns.m5||{}).sells||0}</span></b></div>`;
- document.title=pair.baseToken.symbol+' $'+fmt(pair.marketCap||pair.fdv)+' | Paper';
- dsSol=priceSol;dsUsd=priceUsd;applyLive();
- draw();
+ if(!d.length){if(first)$('#hdr').innerHTML='<span class="dn">No live pair found for this CA.</span>';return}
+ if(!pair){pair=d.sort((a,b)=>((b.liquidity||{}).usd||0)-((a.liquidity||{}).usd||0))[0];buildHeader()} // pair is LOCKED once chosen (#10)
+ else{const same=d.find(x=>x.pairAddress===pair.pairAddress);if(same)pair=same}
+ const pu=+pair.priceUsd||0,pn=+pair.priceNative||0,q=(pair.quoteToken||{}).symbol||'';
+ if(q==='SOL'||q==='WSOL'){if(pn)solUsd=pu/pn;dsSol=pn}
+ else{if(!solUsd){const s=await f('https://api.dexscreener.com/tokens/v1/solana/'+WSM);const sp=(s||[]).find(p=>p.quoteToken&&/USD/.test(p.quoteToken.symbol));solUsd=sp?+sp.priceUsd:0}dsSol=solUsd?pu/solUsd:0}
+ dsUsd=pu;if(pu)supply=(pair.marketCap||pair.fdv||0)/pu;
+ const ch=pair.priceChange||{},c=(id,v)=>{const e=document.getElementById(id);if(e){e.className=(v||0)>=0?'up':'dn';e.textContent=((v||0)>=0?'+':'')+(v??0)+'%'}};
+ const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+ set('hLiq',usd((pair.liquidity||{}).usd));set('hVol',usd((pair.volume||{}).h24));c('h5',ch.m5);c('h1',ch.h1);c('h24',ch.h24);
+ const t5=(pair.txns&&pair.txns.m5)||{};const tx=document.getElementById('hTx');if(tx)tx.innerHTML=`<span class="up">${t5.buys||0}</span>/<span class="dn">${t5.sells||0}</span>`;
+ pickPrice();sched(false);
 }
-async function loadRC(){ rc=await f('https://api.rugcheck.xyz/v1/tokens/'+ca+'/report'); drawSec(); if(tab==='hold')drawPane(); vaultSub() }
+// choose the price in use: live when the websocket is up and calibrated, else DexScreener (flagged stale)
+function pickPrice(){
+ if(isLive()){priceSol=live.p;priceUsd=solUsd?live.p*solUsd:(dsSol?dsUsd*live.p/dsSol:0)}
+ else{priceSol=dsSol;priceUsd=dsUsd}
+}
+async function loadRC(){const r=await f('https://api.rugcheck.xyz/v1/tokens/'+ca+'/report');if(r)rc=r;drawSec();if(tab==='hold')drawPane(true);if(!sock)connect()}
+function realHolders(){if(!rc)return[];const _ka=rc.knownAccounts||{},_pool=new Set();(rc.markets||[]).forEach(x=>[x.liquidityA,x.liquidityB,x.pubkey,x.liquidityAAccount,x.liquidityBAccount].forEach(a=>a&&_pool.add(a)));return (rc.topHolders||[]).filter(h=>!(_pool.has(h.address)||_pool.has(h.owner)||/AMM/i.test(((_ka[h.owner]||_ka[h.address]||{}).type)||'')))}
+const top10=()=>realHolders().slice(0,10).reduce((s,h)=>s+(h.pct||0),0);
 function drawSec(){
  if(!rc){$('#sec').innerHTML='<div class="muted" style="grid-column:1/4">RugCheck unavailable</div>';return}
- const _ka=(rc&&rc.knownAccounts)||{},_pool=new Set();((rc&&rc.markets)||[]).forEach(x=>[x.liquidityA,x.liquidityB,x.pubkey,x.liquidityAAccount,x.liquidityBAccount].forEach(a=>a&&_pool.add(a)));const isPool=h=>_pool.has(h.address)||_pool.has(h.owner)||/AMM/i.test(((_ka[h.owner]||_ka[h.address]||{}).type)||'');const realH=((rc&&rc.topHolders)||[]).filter(h=>!isPool(h));const top10=realH.slice(0,10).reduce((s,h)=>s+(h.pct||0),0), lp=(()=>{const mk=(rc.markets||[]).map(x=>x.lp||{}),tot=mk.reduce((t,l)=>t+(l.quoteUSD||0)+(l.baseUSD||0),0),lk=mk.reduce((t,l)=>t+(l.lpLockedUSD||0),0);return tot>0?lk/tot*100:Math.max(0,...mk.map(l=>l.lpLockedPct||0))})();
+ const t10=top10(),lp=(()=>{const mk=(rc.markets||[]).map(x=>x.lp||{}),tot=mk.reduce((t,l)=>t+(l.quoteUSD||0)+(l.baseUSD||0),0),lk=mk.reduce((t,l)=>t+(l.lpLockedUSD||0),0);return tot>0?lk/tot*100:Math.max(0,...mk.map(l=>l.lpLockedPct||0))})();
  const cell=(l,v,ok)=>`<div><b class="${ok?'up':'dn'}">${v}</b><span>${l}</span></div>`;
- $('#sec').innerHTML=cell('Top 10 H.',top10.toFixed(1)+'%',top10<=25)+cell('LP Locked',lp.toFixed(0)+'%',lp>=80)+cell('Insider nets',rc.graphInsidersDetected||0,(rc.graphInsidersDetected||0)<=3)
+ $('#sec').innerHTML=cell('Top 10 H.',t10.toFixed(1)+'%',t10<=25)+cell('LP Locked',lp.toFixed(0)+'%',lp>=80)+cell('Insider nets',rc.graphInsidersDetected||0,(rc.graphInsidersDetected||0)<=3)
  +cell('Mint Auth',rc.mintAuthority?'ON':'No',!rc.mintAuthority)+cell('Freeze Auth',rc.freezeAuthority?'ON':'No',!rc.freezeAuthority)+cell('Holders',fmt(rc.totalHolders||0,0),(rc.totalHolders||0)>=200);
 }
-function P(){return st.pos[ca]||(st.pos[ca]={sym:pair?pair.baseToken.symbol:'?',tok:0,cost:0,in:0,out:0})}
+
+// ---------- trading ----------
 function quick(){const q=$('#quick');q.innerHTML=(side==='buy'?['0.1','0.5','1','5']:['25%','50%','75%','100%']).map(v=>`<button>${v}</button>`).join('');
  q.querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#amt').value=b.textContent.replace('%','')})}
 function setSide(s){side=s;$('#tBuy').classList.toggle('on',s==='buy');$('#tSell').classList.toggle('on',s==='sell');$('#unit').textContent=s==='buy'?'PAPER SOL':'% OF BAG';
- const g=$('#go');g.className='go '+(s==='buy'?'b':'s');g.textContent=s==='buy'?'Paper Buy':'Paper Sell';$('#amt').value='';quick()}
+ const g=$('#go');g.className='go '+(s==='buy'?'b':'s');g.textContent=s==='buy'?'Paper Buy':'Paper Sell';$('#amt').value='';quick();sched(false)}
 $('#tBuy').onclick=()=>setSide('buy');$('#tSell').onclick=()=>setSide('sell');
-$('#go').onclick=()=>{
- if(!priceSol)return toast('No live price yet');const v=+$('#amt').value;if(!(v>0))return toast('Enter an amount');const p=P();
- if(side==='buy'){ if(v>st.bal)return toast('Not enough paper SOL');
-  const fill=priceSol*(1+SLIP), tok=v*(1-FEE)/fill; st.bal-=v; p.tok+=tok; p.cost+=v; p.in+=v; p.sym=pair.baseToken.symbol;
-  st.hist.unshift({t:Date.now(),ca,sym:p.sym,side:'BUY',sol:v,tok,mc:pair.marketCap||pair.fdv}); toast(`Paper bought ${fmt(tok)} ${p.sym} for ${v} SOL`)}
- else{ if(!p.tok)return toast('You hold none');const pct=Math.min(v,100)/100, tok=p.tok*pct, fill=priceSol*(1-SLIP), sol=tok*fill*(1-FEE), basis=p.cost*pct;
-  p.cost-=basis; p.tok-=tok; p.out+=sol; st.bal+=sol;
-  st.hist.unshift({t:Date.now(),ca,sym:p.sym,side:'SELL',sol,tok,pnl:sol-basis,mc:pair.marketCap||pair.fdv}); toast(`Paper sold ${pct*100}% for ${sol.toFixed(3)} SOL`)}
- save();draw()};
-$('#reset').onclick=e=>{e.preventDefault();if(confirm('Reset paper wallet to '+START+' SOL and clear history?')){st={bal:START,pos:{},hist:[]};save();draw()}};
-document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.p;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));drawPane()});
-function draw(){$('#bal').textContent=st.bal.toFixed(3)+' SOL'+(solUsd?' ≈ $'+(st.bal*solUsd).toFixed(0):'');if(!ca)return;const p=st.pos[ca];
- const val=p?p.tok*priceSol:0, pnl=p?val+p.out-p.in:0;
- $('#pB').textContent=p?p.in.toFixed(2):0;$('#pS').textContent=p?p.out.toFixed(2):0;$('#pH').textContent=val.toFixed(3);
- const e=$('#pP');e.textContent=(pnl>=0?'+':'')+pnl.toFixed(3)+(solUsd?' ($'+(pnl*solUsd).toFixed(0)+')':'')+(p&&p.in?` (${(pnl/p.in*100).toFixed(0)}%)`:'');e.className=pnl>=0?'up':'dn';drawPane()}
-function drawPane(){const el=$('#pane');
- if(tab==='pos'){const rows=Object.entries(st.pos).filter(([,p])=>p.tok>0||p.in>0);
-  el.innerHTML='<table><tr><th>Token</th><th>Bought</th><th>Sold</th><th>Holding</th><th>PnL</th></tr>'+rows.map(([k,p])=>{const live=k===ca, val=live?p.tok*priceSol:null, pnl=live?val+p.out-p.in:null;
-   return `<tr><td><a href="?ca=${k}">${p.sym}</a></td><td>${p.in.toFixed(2)}</td><td>${p.out.toFixed(2)}</td><td>${live?val.toFixed(3):'open to update'}</td><td class="${pnl>=0?'up':'dn'}">${live?(pnl>=0?'+':'')+pnl.toFixed(3):'-'}</td></tr>`}).join('')+'</table>'}
- if(tab==='hist'){el.innerHTML='<div class="row" style="padding:4px 0"><span class="muted">Your paper trades</span><a href="#" id="csv">Export CSV for vault</a></div><table><tr><th>Time</th><th>Token</th><th>Side</th><th>SOL</th><th>MC at trade</th></tr>'+st.hist.slice(0,200).map(h=>`<tr><td>${new Date(h.t).toLocaleString()}</td><td>${h.sym}</td><td class="${h.side==='BUY'?'up':'dn'}">${h.side}</td><td>${h.sol.toFixed(3)}</td><td>$${fmt(h.mc)}</td></tr>`).join('')+'</table>';
-  $('#csv').onclick=e=>{e.preventDefault();const c='time,token,ca,side,sol,tokens,mc\n'+st.hist.map(h=>[new Date(h.t).toISOString(),h.sym,h.ca,h.side,h.sol,h.tok,h.mc].join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='paper_trades.csv';a.click()}}
- if(tab==='hold'){if(!rc){el.innerHTML='<div class="muted">Loading holders…</div>';return}
-  el.innerHTML='<table><tr><th>#</th><th>Wallet</th><th>% Supply</th><th>Insider?</th></tr>'+(rc.topHolders||[]).slice(0,20).map((h,i)=>`<tr><td>${i+1}</td><td><a target=_blank href="https://solscan.io/account/${h.owner||h.address}">${(h.owner||h.address||'').slice(0,4)}…${(h.owner||h.address||'').slice(-4)}</a></td><td>${(h.pct||0).toFixed(2)}%</td><td>${((rc.markets||[]).some(x=>[x.liquidityA,x.liquidityB,x.pubkey].includes(h.address))||/AMM/i.test((((rc.knownAccounts||{})[h.owner]||{}).type)||''))?'<span class="muted">pool (not a holder)</span>':h.insider?'<span class="dn">yes</span>':''}</td></tr>`).join('')+'</table>'}
- if(tab==='about'){const i=(pair&&pair.info)||{},sym=pair?pair.baseToken.symbol.replace(/^\$/,''):'';el.innerHTML='<div style="padding:8px;line-height:1.7"><b>'+(pair?pair.baseToken.name:'')+' ($'+sym+')</b><br>Age: '+(pair&&pair.pairCreatedAt?(h=>h<48?Math.round(h)+'h':Math.round(h/24)+'d')((Date.now()-pair.pairCreatedAt)/36e5):'-')+'<br>'+((i.websites||[]).map(w=>'<a target=_blank href="'+w.url+'">🌐 Website</a>').join(' ')||'No website')+' '+((i.socials||[]).map(x=>'<a target=_blank href="'+x.url+'">'+x.type+'</a>').join(' '))+'<br><b>Narrative:</b> <a target=_blank href="https://x.com/search?q=%24'+sym+'&f=live">Search $'+sym+' on X (live)</a> · <a target=_blank href="https://x.com/search?q='+ca+'&f=live">Search CA on X</a><br><span class="muted">Ask: what is this coin about, is the story real/current, who is posting it?</span></div>';return}
- if(tab==='live')return drawLive(el);
- if(tab==='cal')return drawCal(el);
- if(tab==='port'){const tot=st.hist.length, buys=st.hist.filter(h=>h.side==='BUY').reduce((s,h)=>s+h.sol,0), sells=st.hist.filter(h=>h.side==='SELL').reduce((s,h)=>s+h.sol,0);
-  el.innerHTML=`<div style="padding:8px"><div>Paper balance: <b>${st.bal.toFixed(3)} SOL</b> (started ${START})</div><div>Trades: <b>${tot}</b> · Total bought: <b>${buys.toFixed(2)}</b> · Total sold: <b>${sells.toFixed(2)}</b> SOL</div><div class="muted" style="margin-top:6px">Open coins keep their tokens; open a coin to see its live value.</div></div>`}
-}
 
-// ===== Live trade feed (Solana RPC websocket; free) =====
-// ===== LIVE on-chain price (fixes DexScreener's 20-40s delay) =====
-// Uses the median of the last 3 exactly-parsed on-chain trades if the newest is <15s old; else DexScreener.
-let dsSol=0,dsUsd=0,livePx=[];
-// Pool calibration: "SOL ÷ tokens in the pool" = price ONLY for simple pools (PumpSwap, Raydium AMM, Meteora DAMM).
-// Concentrated-liquidity pools (Orca Whirlpool, Raydium CLMM, Meteora DLMM) read ~2x off (BONK Orca: 1.45e-8 vs 3.05e-8).
-// First 5 readings vs DexScreener: within 4% -> live OK; otherwise live pricing OFF for this coin.
-let calib={r:[],ok:null};
-function calibOk(p){if(calib.ok!==null)return calib.ok;if(!dsSol)return false;calib.r.push(p/dsSol);if(calib.r.length<5)return false;const s=calib.r.slice().sort((a,b)=>a-b),m=s[2];calib.ok=Math.abs(m-1)<0.04;calib.m=m;return calib.ok}
-function applyLive(){if(livePx[0]&&livePx[0].p&&!livePx[0].cal){livePx[0].cal=1;calibOk(livePx[0].p)}const wsOn=vws&&vws.readyState===1&&livePx.some(x=>x.src==='ws');const fresh=livePx.filter(x=>wsOn?x.src==='ws'&&Date.now()-x.at<120000:Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
- if(calib.ok===false){if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — this pool type (concentrated liquidity) can\'t be priced live (pool read '+(calib.m||0).toFixed(2)+'x DexScreener)';return false}
- if(fresh.length&&dsSol&&calib.ok){const r=fresh.slice(0,wsOn?1:3).map(x=>x.p).sort((a,b)=>a-b),med=r[Math.floor(r.length/2)];
-  if(med>dsSol*0.5&&med<dsSol*2){priceSol=med;priceUsd=solUsd?med*solUsd:dsUsd*med/dsSol;if(vl)vl.textContent='$'+(priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4));
-   if(el){const lag=Math.round((Date.now()-fresh[0].bt)/1000);el.innerHTML='<b class="up">⚡ live on-chain</b> · '+(fresh[0].src==='ws'?'websocket (instant) · '+vSrc:'last trade '+lag+'s ago')}return true}}
- if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — no fresh on-chain trade';return false}
-setInterval(()=>{if(pair){applyLive();draw()}},1000);
-// ===== WEBSOCKET pool vaults: Helius pushes every balance change of the pool's SOL + token vaults (no queue, no polling) =====
-let vws=null,vSub='',vBal={t:null,s:null},vKeys={},vSrc='';
-// Program ids of concentrated-liquidity pools (price decoded from pool state, not from vault balances)
-const CLMM={'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc':'Orca','CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK':'Raydium CLMM','LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo':'Meteora DLMM'};
+// snapshot saved with every trade (#13): what you saw when you clicked
+function qsCard(){try{return JSON.parse(localStorage.getItem('qs_card_'+ca)||'null')}catch(e){return null}}
+function snapshot(){const q=qsCard()||{},warns=[];if(!isLive())warns.push('stale price (DexScreener)');const w=washInfo();if(w)warns.push(w.text);
+ return {mc:Math.round(curMC()||0),liq:Math.round((pair.liquidity||{}).usd||0),top10:rc?+top10().toFixed(1):null,insiders:rc?(rc.graphInsidersDetected||0):null,holders:rc?(rc.totalHolders||0):null,
+  rug:q.rug||'not scanned',timing:q.entry||'not scanned',tips:q.tips||'not checked',wallet:q.wallet||'not checked',scanAgeMin:q.t?Math.round((Date.now()-q.t)/60000):null,
+  price_src:isLive()?'live ('+live.src+')':'stale DexScreener',warnings:warns.join(' | ')||'none'}}
+$('#go').onclick=()=>{
+ if(!pair)return toast('No pair loaded');if(!priceSol)return toast('No price yet');
+ const raw=$('#amt').value.trim(),v=+raw;if(!raw||!isFinite(v)||v<=0)return toast('Enter an amount above 0');
+ const pxNow=priceSol,mcNow=curMC(),puNow=priceUsd,snap=snapshot(),sym=pair.baseToken.symbol;
+ const res=mutate(st=>{const p=st.pos[ca]||(st.pos[ca]={sym,tok:0,cost:0,in:0,out:0,mcw:0,t0:0,hi:0,lo:0});
+  if(side==='buy'){if(v>st.bal+1e-12)return 'Not enough paper SOL (balance '+st.bal.toFixed(3)+')';
+   const fill=pxNow*(1+SLIP),tok=v*(1-FEE)/fill;if(!p.tok){p.t0=Date.now();p.hi=pxNow;p.lo=pxNow;p.cost=0;p.mcw=0}
+   st.bal-=v;p.tok+=tok;p.cost+=v;p.in+=v;p.mcw+=v*(mcNow||0);p.sym=sym;
+   st.hist.unshift({t:Date.now(),ca,sym,side:'BUY',sol:v,tok,px:pxNow,pu:puNow,mc:mcNow,snap});return 'Paper bought '+fmt(tok)+' '+sym+' for '+v+' SOL'}
+  if(!(p.tok>0))return 'You hold none of this coin';if(v>100)return 'Sell % must be 1–100';
+  const pct=v/100,tok=p.tok*pct,fill=pxNow*(1-SLIP),sol=tok*fill*(1-FEE),basis=p.cost*pct,mcBasis=p.mcw*pct;
+  p.cost-=basis;p.mcw-=mcBasis;p.tok-=tok;p.out+=sol;st.bal+=sol;if(p.tok<1e-9){p.tok=0;p.cost=0;p.mcw=0}
+  st.hist.unshift({t:Date.now(),ca,sym:p.sym,side:'SELL',sol,tok,px:pxNow,pu:puNow,mc:mcNow,pnl:sol-basis,snap});return 'Paper sold '+v+'% for '+sol.toFixed(4)+' SOL'});
+ toast(res)};
+$('#reset').onclick=e=>{e.preventDefault();if(confirm('Reset paper wallet to '+START+' SOL and clear ALL history (every window)?')){mutate(st=>{st.bal=START;st.pos={};st.hist=[]});toast('Wallet reset')}};
+// highest gain / biggest drawdown since entry: tracked while a window is open, saved every 10s
+let hlDirty=0;
+function trackHiLo(){const p=st.pos[ca];if(!p||!(p.tok>0)||!priceSol)return;if(priceSol>p.hi){p.hi=priceSol;hlDirty=1}if(!p.lo||priceSol<p.lo){p.lo=priceSol;hlDirty=1}
+ if(hlDirty&&Date.now()-(trackHiLo._t||0)>10000){trackHiLo._t=Date.now();hlDirty=0;const hi=p.hi,lo=p.lo;try{const s2=load();const q=s2.pos[ca];if(q&&q.tok>0){q.hi=Math.max(q.hi||0,hi);q.lo=Math.min(q.lo||lo,lo);localStorage.setItem(K,JSON.stringify(s2));st=s2}}catch(e){}}}
+
+// ---------- drawing (#4, #6): numbers every price tick via rAF; heavy panes only when needed ----------
+let raf=0,paneDirty=false;
+function sched(pane){if(pane)paneDirty=true;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;pickPrice();drawNums();if(paneDirty||['pos','port','live'].includes(tab)){paneDirty=false;drawPane()}})}
+const posPnl=p=>{const val=p.tok*priceSol;return {val,pnl:val+p.out-p.in}};
+function drawNums(){
+ $('#bal').textContent=st.bal.toFixed(3)+' SOL'+(solUsd?' ≈ $'+(st.bal*solUsd).toFixed(0):'');if(!ca||!pair)return;
+ const vl=document.getElementById('pxv'),el=document.getElementById('pxs'),hm=document.getElementById('hMc');
+ if(vl)vl.textContent=priceUsd?'$'+pxs(priceUsd):'-';if(hm)hm.textContent=usd(curMC());
+ if(el){if(isLive())el.innerHTML='<b class="up">⚡ live on-chain</b> · '+live.src;else el.textContent='DexScreener (~20-40s delay)'+(live.msg?' — '+live.msg:'')}
+ document.title=pair.baseToken.symbol+' '+usd(curMC())+' | Paper';
+ const sw=$('#staleW');if(!isLive()){sw.style.display='block';sw.textContent='⚠ Price is STALE (DexScreener ~20-40s behind). Fills will use it.'}else sw.style.display='none';
+ const p=st.pos[ca];const {val,pnl}=p?posPnl(p):{val:0,pnl:0};
+ $('#pB').textContent=p?p.in.toFixed(2):0;$('#pS').textContent=p?p.out.toFixed(2):0;$('#pH').textContent=val.toFixed(3);
+ const e=$('#pP');e.textContent=(pnl>=0?'+':'')+pnl.toFixed(3)+(solUsd?' ($'+(pnl*solUsd).toFixed(0)+')':'')+(p&&p.in?` (${(pnl/p.in*100).toFixed(0)}%)`:'');e.className=pnl>=0?'up':'dn';
+ // #11 stats
+ const ps=$('#pstats');if(!p||!(p.tok>0)){ps.innerHTML='<div class="muted" style="grid-column:1/4">No open position in this coin</div>';return}
+ const ent=p.cost/p.tok, entMc=p.cost?p.mcw/p.cost:null, cm=curMC(), fromE=ent?(priceSol/ent-1)*100:0, hi=Math.max(p.hi||0,priceSol), lo=Math.min(p.lo||priceSol,priceSol);
+ const mins=Math.round((Date.now()-p.t0)/60000),tt=mins<60?mins+'m':Math.floor(mins/60)+'h '+(mins%60)+'m';
+ const c3=(l,v,cl='')=>`<div><b class="${cl}">${v}</b><span>${l}</span></div>`;
+ ps.innerHTML=c3('Avg entry',showMP(entMc,ent*(solUsd||0)))+c3('Now',showMP(cm,priceUsd))+c3('From entry',(fromE>=0?'+':'')+fromE.toFixed(1)+'%',fromE>=0?'up':'dn')
+  +c3('Max gain',(ent?((hi/ent-1)*100):0).toFixed(1)+'%','up')+c3('Max drawdown',(ent?((lo/ent-1)*100):0).toFixed(1)+'%','dn')+c3('Time in trade',tt);
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.p;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));drawPane(true)});
+function realized(){return st.hist.filter(h=>h.side==='SELL'&&h.pnl!=null).reduce((s,h)=>s+h.pnl,0)}
+function tradeText(h){const s=h.snap||{};return `${new Date(h.t).toLocaleString()} · ${h.side} ${h.sym} · ${h.sol.toFixed(4)} SOL · ${fmt(h.tok)} tokens · MC ${usd(h.mc)}${h.pnl!=null?' · PnL '+(h.pnl>=0?'+':'')+h.pnl.toFixed(4)+' SOL':''}
+  CA ${h.ca}
+  At click: MC ${usd(s.mc)}, liquidity ${usd(s.liq)}, top10 ${s.top10??'-'}%, insiders ${s.insiders??'-'}, holders ${s.holders??'-'}
+  Quick Scan: rug=${s.rug}, timing=${s.timing}, tips=${s.tips}, wallet map=${s.wallet}${s.scanAgeMin!=null?' (scanned '+s.scanAgeMin+' min before)':''}
+  Price source: ${s.price_src}; warnings: ${s.warnings}`}
+function copyText(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Copied for Claude review'),()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Copied for Claude review')})}
+function drawPane(force){const el=$('#pane');const keep=el.scrollTop;
+ if(tab==='pos'){const rows=Object.entries(st.pos).filter(([,p])=>p.tok>0||p.in>0);
+  el.innerHTML='<table><tr><th>Token</th><th>Bought</th><th>Sold</th><th>Holding</th><th>PnL</th></tr>'+rows.map(([k,p])=>{const live_=k===ca,{val,pnl}=live_?posPnl(p):{};
+   return `<tr><td><a href="?ca=${k}">${p.sym}</a></td><td>${p.in.toFixed(2)}</td><td>${p.out.toFixed(2)}</td><td>${live_?val.toFixed(3):(p.tok>0?'open coin to update':'0')}</td><td class="${(live_?pnl:p.out-p.in)>=0?'up':'dn'}">${live_?(pnl>=0?'+':'')+pnl.toFixed(3):(p.tok>0?'-':((p.out-p.in>=0?'+':'')+(p.out-p.in).toFixed(3)))}</td></tr>`}).join('')+'</table>'}
+ else if(tab==='hist'){if(!force&&el.dataset.n==String(st.hist.length)&&el.dataset.u===unit)return;el.dataset.n=st.hist.length;el.dataset.u=unit;
+  el.innerHTML='<div class="row" style="padding:4px 0"><span class="muted">Your paper trades ('+st.hist.length+')</span><span><a href="#" id="cpday">Copy today for Claude review</a> · <a href="#" id="csv">Export CSV</a></span></div><table><tr><th>Time</th><th>Token</th><th>Side</th><th>SOL</th><th>'+(unit==='mc'?'MC':'Price')+' at trade</th><th></th></tr>'+st.hist.slice(0,300).map((h,i)=>`<tr><td>${new Date(h.t).toLocaleString()}</td><td>${h.sym}</td><td class="${h.side==='BUY'?'up':'dn'}">${h.side}</td><td>${h.sol.toFixed(3)}</td><td>${showMP(h.mc,h.pu)}</td><td><a href="#" data-cp="${i}">copy</a></td></tr>`).join('')+'</table>';
+  el.querySelectorAll('[data-cp]').forEach(a=>a.onclick=e=>{e.preventDefault();copyText(tradeText(st.hist[+a.dataset.cp]))});
+  $('#cpday').onclick=e=>{e.preventDefault();const d=new Date().toDateString(),t=st.hist.filter(h=>new Date(h.t).toDateString()===d).reverse();copyText(t.length?'My paper trades today ('+t.length+'):\n\n'+t.map(tradeText).join('\n\n'):'No trades today')};
+  $('#csv').onclick=e=>{e.preventDefault();const SK=['mc','liq','top10','insiders','holders','rug','timing','tips','wallet','scanAgeMin','price_src','warnings'];
+   const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+   const c='time,token,ca,side,sol,tokens,price_sol,price_usd,mc,pnl_sol,'+SK.map(k=>'snap_'+k).join(',')+'\n'+st.hist.map(h=>[new Date(h.t).toISOString(),h.sym,h.ca,h.side,h.sol,h.tok,h.px,h.pu,h.mc,h.pnl,...SK.map(k=>(h.snap||{})[k])].map(q).join(',')).join('\n');
+   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='paper_trades.csv';a.click()}}
+ else if(tab==='hold'){if(!force)return;if(!rc){el.innerHTML='<div class="muted">Loading holders…</div>';return}
+  el.innerHTML='<table><tr><th>#</th><th>Wallet</th><th>% Supply</th><th>Insider?</th></tr>'+(rc.topHolders||[]).slice(0,20).map((h,i)=>`<tr><td>${i+1}</td><td><a target=_blank href="https://solscan.io/account/${h.owner||h.address}">${(h.owner||h.address||'').slice(0,4)}…${(h.owner||h.address||'').slice(-4)}</a></td><td>${(h.pct||0).toFixed(2)}%</td><td>${((rc.markets||[]).some(x=>[x.liquidityA,x.liquidityB,x.pubkey].includes(h.address))||/AMM/i.test((((rc.knownAccounts||{})[h.owner]||{}).type)||''))?'<span class="muted">pool (not a holder)</span>':h.insider?'<span class="dn">yes</span>':''}</td></tr>`).join('')+'</table>'}
+ else if(tab==='about'){if(!force)return;const i=(pair&&pair.info)||{},sym=pair?pair.baseToken.symbol.replace(/^\$/,''):'';el.innerHTML='<div style="padding:8px;line-height:1.7"><b>'+(pair?pair.baseToken.name:'')+' ($'+sym+')</b><br>Age: '+(pair&&pair.pairCreatedAt?(h=>h<48?Math.round(h)+'h':Math.round(h/24)+'d')((Date.now()-pair.pairCreatedAt)/36e5):'-')+'<br>'+((i.websites||[]).map(w=>'<a target=_blank href="'+w.url+'">🌐 Website</a>').join(' ')||'No website')+' '+((i.socials||[]).map(x=>'<a target=_blank href="'+x.url+'">'+x.type+'</a>').join(' '))+'<br><b>Narrative:</b> <a target=_blank href="https://x.com/search?q=%24'+sym+'&f=live">Search $'+sym+' on X (live)</a> · <a target=_blank href="https://x.com/search?q='+ca+'&f=live">Search CA on X</a><br><span class="muted">Ask: what is this coin about, is the story real/current, who is posting it?</span></div>'}
+ else if(tab==='live'){drawLive(el)}
+ else if(tab==='cal'){if(!force&&el.dataset.n==String(st.hist.length))return;el.dataset.n=st.hist.length;drawCal(el)}
+ else if(tab==='port'){const tot=st.hist.length,buys=st.hist.filter(h=>h.side==='BUY').reduce((s,h)=>s+h.sol,0),sells=st.hist.filter(h=>h.side==='SELL').reduce((s,h)=>s+h.sol,0),p=st.pos[ca],u=p?posPnl(p).pnl:0,r=realized();
+  el.innerHTML=`<div style="padding:8px;line-height:1.8"><div>Paper balance: <b>${st.bal.toFixed(3)} SOL</b> (started ${START})</div><div>Trades: <b>${tot}</b> · Total bought: <b>${buys.toFixed(2)}</b> · Total sold: <b>${sells.toFixed(2)}</b> SOL</div><div>Realized PnL (all closed sells): <b class="${r>=0?'up':'dn'}">${(r>=0?'+':'')+r.toFixed(3)} SOL</b></div><div>This coin (live): <b class="${u>=0?'up':'dn'}">${(u>=0?'+':'')+u.toFixed(3)} SOL</b></div><div class="muted">Other open coins keep their tokens; open a coin to see its live value.</div></div>`}
+ el.scrollTop=keep}
+
+// ---------- ONE websocket per window: pool price + trade feed (#3) ----------
+const PROG={'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA':'PumpSwap','675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8':'Raydium AMM','CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C':'Raydium CPMM','Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB':'Meteora DAMM','6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P':'pump.fun curve',
+ 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc':'Orca','CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK':'Raydium CLMM','LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo':'Meteora DLMM'};
+const TRUSTED=new Set(['PumpSwap','Raydium AMM','Raydium CPMM','Meteora DAMM','pump.fun curve']); // exact by design -> no calibration
 const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 function b58(u){let n=0n;for(const b of u)n=n*256n+BigInt(b);let o='';while(n>0n){o=B58[Number(n%58n)]+o;n/=58n}for(const b of u){if(b===0)o='1'+o;else break}return o}
 const u8=a=>Uint8Array.from(atob(a),c=>c.charCodeAt(0));
-const u128=(d,o)=>{const v=new DataView(d.buffer,d.byteOffset);return (v.getBigUint64(o+8,true)<<64n)|v.getBigUint64(o,true)};
-// SOL per 1 quote token, from DexScreener (USDC/stock rate moves slowly). SOL quote = 1.
-const qConv=()=>{const pn=+pair.priceNative||0;return pn&&dsSol?dsSol/pn:0};
-function pushLive(pq,src){const c=qConv();if(!(pq>0)||!c)return;vSrc=src;livePx.unshift({p:pq*c,at:Date.now(),bt:Date.now(),src:'ws'});livePx=livePx.slice(0,300);applyLive();if(tab==='live')drawPane()}
-const rpcJ=async(mt,pr)=>(await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})})).json();
-async function vaultSub(){try{if(!pair||!rc||!rc.markets)return;const k=rpcUrls();if(!k.ws.includes('helius'))return;
- const key=pair.pairAddress;if(vSub===key&&vws&&vws.readyState<2)return;vSub=key;try{vws&&vws.close()}catch(e){}
- const ai=(await rpcJ('getAccountInfo',[pair.pairAddress,{encoding:'base64'}])).result;const owner=ai&&ai.value&&ai.value.owner,kind=CLMM[owner];
- let subs=[],onData=null;
- if(kind){ // ---- concentrated pool: decode price from pool account ----
-  const d=u8(ai.value.data[0]);let mA,mB;
-  if(kind==='Orca'){mA=b58(d.slice(101,133));mB=b58(d.slice(181,213))}
-  else if(kind==='Raydium CLMM'){mA=b58(d.slice(73,105));mB=b58(d.slice(105,137))}
-  else {mA=b58(d.slice(88,120));mB=b58(d.slice(120,152))}
-  if(mA!==ca&&mB!==ca)return;const ms=(await rpcJ('getMultipleAccounts',[[mA,mB],{encoding:'jsonParsed'}])).result.value;const dA=ms[0].data.parsed.info.decimals,dB=ms[1].data.parsed.info.decimals;
-  const price=dd=>{let pAB; // tokenB per tokenA, human units
-   if(kind==='Meteora DLMM'){const v=new DataView(dd.buffer,dd.byteOffset);const id=v.getInt32(76,true),bs=v.getUint16(80,true);pAB=Math.pow(1+bs/1e4,id)*Math.pow(10,dA-dB)}
-   else{const sp=Number(u128(dd,kind==='Orca'?65:253))/2**64;pAB=sp*sp*Math.pow(10,dA-dB)}
-   return mA===ca?pAB:1/pAB};
-  pushLive(price(d),kind);subs=[[pair.pairAddress,'base64']];
-  // fast calibration: 4 more direct reads, 1s apart (quiet pools may not change for minutes)
-  (async()=>{for(let i=0;i<4;i++){await new Promise(r=>setTimeout(r,1000));try{const a2=(await rpcJ('getAccountInfo',[pair.pairAddress,{encoding:'base64'}])).result;if(a2&&a2.value)pushLive(price(u8(a2.value.data[0])),kind)}catch(e){}}})();onData=(w,val)=>pushLive(price(u8(val.data[0])),kind);
- } else { // ---- simple pool: quote vault ÷ base vault (any quote token: SOL, USDC, stock) ----
-  const mk=rc.markets.find(x=>x.pubkey===pair.pairAddress);if(!mk||!mk.liquidityA||!mk.liquidityB)return;
-  const baseIsA=mk.mintA===ca,tv=baseIsA?mk.liquidityA:mk.liquidityB,sv=baseIsA?mk.liquidityB:mk.liquidityA;vBal={t:null,s:null};
-  subs=[[tv,'jsonParsed','t'],[sv,'jsonParsed','s']];
-  (async()=>{for(let i=0;i<5;i++){try{const r=(await rpcJ('getMultipleAccounts',[[tv,sv],{encoding:'jsonParsed'}])).result.value;vBal.t=+r[0].data.parsed.info.tokenAmount.uiAmount;vBal.s=+r[1].data.parsed.info.tokenAmount.uiAmount;if(vBal.t>0&&vBal.s>0)pushLive(vBal.s/vBal.t,(pair.quoteToken||{}).symbol==='SOL'?'pool':'pool ('+(pair.quoteToken||{}).symbol+')')}catch(e){}await new Promise(r=>setTimeout(r,1000))}})();
-  onData=(w,val)=>{vBal[w]=+val.data.parsed.info.tokenAmount.uiAmount;if(vBal.t>0&&vBal.s>0)pushLive(vBal.s/vBal.t,(pair.quoteToken||{}).symbol==='SOL'?'pool':'pool ('+(pair.quoteToken||{}).symbol+')')};
- }
- vws=new WebSocket(k.ws);vKeys={};
- vws.onopen=()=>subs.forEach((x,i)=>vws.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:'accountSubscribe',params:[x[0],{encoding:x[1],commitment:'processed'}]})));
- vws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id&&m.result!=null){vKeys[m.result]=(subs[m.id-1]||[])[2]||'p';return}
-  if(m.method==='accountNotification'){try{onData(vKeys[m.params.subscription],m.params.result.value)}catch(x){}}};
- vws.onclose=()=>{vSub='';setTimeout(vaultSub,2000)};}catch(e){}}
-const WSM='So11111111111111111111111111111111111111112';
-const HK='papertrade_helius';let trades=[],ws=null,seen=new Set(),q=[],busy=false;
-function rpcUrls(){let k='';try{k=localStorage.getItem(HK)||''}catch(e){}
- k=k.trim();if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k))k='';
- return k?{http:'https://mainnet.helius-rpc.com/?api-key='+k,ws:'wss://mainnet.helius-rpc.com/?api-key='+k}:{http:'https://api.mainnet-beta.solana.com',ws:'wss://api.mainnet-beta.solana.com'}}
-function startFeed(){if(!pair||!pair.pairAddress)return;if(!rpcUrls().http.includes('helius')){$('#feedSt').innerHTML='<span class="dn">needs Helius key ↓</span>';return}try{ws&&ws.close()}catch(e){}
- const u=rpcUrls();ws=new WebSocket(u.ws);$('#feedSt').textContent='connecting…';
- ws.onopen=()=>{startPoll();ws.send(JSON.stringify({jsonrpc:'2.0',id:1,method:'logsSubscribe',params:[{mentions:[pair.pairAddress]},{commitment:'confirmed'}]}));$('#feedSt').innerHTML='<span class="up">● live</span>'};
- ws.onmessage=e=>{const m=JSON.parse(e.data),v=m.params&&m.params.result&&m.params.result.value;if(!v||v.err||seen.has(v.signature))return;seen.add(v.signature);q.push(v.signature);if(q.length>40)q.shift();pump()};
- ws.onclose=()=>{fails++;if(fails>=2){startPoll();return}$('#feedSt').innerHTML='<span class="dn">reconnecting…</span>';setTimeout(startFeed,3000)};ws.onerror=()=>{}}
-let fails=0,polling=null,lastSig=null;
-function startPoll(){if(polling)return;try{ws&&(ws.onclose=null,ws.close())}catch(e){}$('#feedSt').innerHTML='<span class="up">● live</span>';
- polling=setInterval(async()=>{try{const r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getSignaturesForAddress',params:[pair.pairAddress,{limit:15}]})}).then(r=>r.json());
-  if(r.error){$('#feedSt').innerHTML='<span class="dn">error: '+r.error.message+'</span>';return}
-  const sigs=(r.result||[]).filter(x=>!x.err).map(x=>x.signature);const fresh=[];for(const g of sigs){if(g===lastSig)break;fresh.push(g)}
-  if(sigs.length)lastSig=sigs[0];fresh.reverse().forEach(g=>{if(!seen.has(g)){seen.add(g);q.push(g)}});pump()}catch(e){$('#feedSt').innerHTML='<span class="dn">rate-limited, retrying…</span>'}},rpcUrls().http.includes('helius')?1000:4000)}
-async function pump(){if(busy)return;busy=true;while(q.length){if(q.length>8)q.splice(0,q.length-8);const sig=q.shift();await parseTx(sig);await new Promise(r=>setTimeout(r,rpcUrls().http.includes('helius')?80:400))}busy=false}
-async function parseTx(sig){try{const r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getTransaction',params:[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:1,commitment:'confirmed'}]})}).then(r=>r.json());
- if(r.error){$('#feedSt').innerHTML='<span class="dn">tx error: '+r.error.message+'</span>';return}const tx=r.result;if(!tx)return;const signer=tx.transaction.message.accountKeys[0].pubkey||tx.transaction.message.accountKeys[0];
- const bal=a=>(a||[]).filter(b=>b.mint===ca&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
- const dTok=bal(tx.meta.postTokenBalances)-bal(tx.meta.preTokenBalances);if(!dTok)return;
- // SOL side = plain SOL change + wrapped-SOL (WSOL) token change of the trader. Before: only plain SOL, so most trades showed ~fee only.
- const WS='So11111111111111111111111111111111111111112',wb=a=>(a||[]).filter(b=>b.mint===WS&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
- let dSol=Math.abs((tx.meta.postBalances[0]-tx.meta.preBalances[0]+tx.meta.fee)/1e9+(wb(tx.meta.postTokenBalances)-wb(tx.meta.preTokenBalances)));
- const est=Math.abs(dTok)*(dsSol||priceSol);let approx=false;
- // routed/ stock-paired trades: if parsed SOL is way off the live price, show the price-based estimate (marked ~)
- if(est&&(dSol<est*0.5||dSol>est*2)){dSol=est;approx=true}
- trades.unshift({t:(tx.blockTime||Date.now()/1000)*1000,side:dTok>0?'BUY':'SELL',tok:Math.abs(dTok),sol:dSol,approx,w:signer,sig});
- // pool price from the pool's own balances after this tx (= what Axiom shows). Owner holding the most of this token AND some SOL = the pool.
- {const own={};(tx.meta.postTokenBalances||[]).forEach(b=>{if(b.owner===signer)return;const o=own[b.owner]||(own[b.owner]={t:0,s:0});if(b.mint===ca)o.t+=(+b.uiTokenAmount.uiAmount||0);else if(b.mint===WS)o.s+=(+b.uiTokenAmount.uiAmount||0)});
-  const pool=Object.values(own).filter(o=>o.t>0&&o.s>0).sort((a,b)=>b.t-a.t)[0];
-  if(pool&&!(vws&&vws.readyState===1&&livePx.some(x=>x.src==='ws'))){livePx.unshift({p:pool.s/pool.t,at:Date.now(),bt:(tx.blockTime||Date.now()/1000)*1000});livePx=livePx.slice(0,200);applyLive()}}if(trades.length>100)trades.pop();
- if(tab==='live')drawPane()}catch(e){}}
-$('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
-$('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
- try{localStorage.setItem(HK,v)}catch(e){};fails=0;clearInterval(polling);polling=null;startFeed();toast(v?'Helius key saved':'Using public network')};
-function drawLive(el){const c={};trades.slice(0,40).forEach(x=>c[x.w]=(c[x.w]||0)+1);const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];
- const warn=trades.length>=15&&top&&top[1]/Math.min(trades.length,40)>=.3?'<div style="padding:6px;color:#ff4d6a;font-weight:700">⚠️ Wash trading? Wallet '+top[0].slice(0,4)+'…'+top[0].slice(-4)+' made '+top[1]+' of the last '+Math.min(trades.length,40)+' trades — fake volume.</div>':'';
- const stair=''; // Staircase warning CUT 2026-10-30: never fired on a live coin
- const pts=livePx.slice(0,120).slice().reverse();let spark='';if(pts.length>=3){const ps=pts.map(x=>x.p),lo=Math.min(...ps),hi=Math.max(...ps),W=600,H=70,X=i=>i/(pts.length-1)*W,Y=v=>hi===lo?H/2:H-4-(v-lo)/(hi-lo)*(H-8);spark='<div class="muted" style="font-size:11px">⚡ Live on-chain price (last '+pts.length+' trades, updates every trade)</div><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:70px;background:#0e1118;border-radius:6px"><polyline fill="none" stroke="'+(ps[ps.length-1]>=ps[0]?'#2fe0a5':'#ff4d6a')+'" stroke-width="2" points="'+pts.map((x,i)=>X(i).toFixed(1)+','+Y(x.p).toFixed(1)).join(' ')+'"/></svg>'}
- el.innerHTML=spark+warn+stair+'<table><tr><th>Age</th><th>Side</th><th>SOL</th><th>Tokens</th><th>Wallet</th></tr>'+(trades.length?trades.map(x=>{const a=Math.round((Date.now()-x.t)/1000);return `<tr><td>${a<60?a+'s':Math.round(a/60)+'m'}</td><td class="${x.side==='BUY'?'up':'dn'}">${x.side}</td><td>${(x.approx?"~":"")+x.sol.toFixed(3)}</td><td>${fmt(x.tok)}</td><td><a target=_blank href="https://solscan.io/tx/${x.sig}">${x.w.slice(0,4)}…${x.w.slice(-4)}</a></td></tr>`}).join(''):'<tr><td colspan=5 class="muted">Waiting for trades… (quiet coins may take a while)</td></tr>')+'</table>'}
-setInterval(()=>{if(tab==='live')drawPane()},5000);
+const u64=(d,o)=>new DataView(d.buffer,d.byteOffset).getBigUint64(o,true);
+const u128=(d,o)=>(u64(d,o+8)<<64n)|u64(d,o);
+function rpcUrls(){let k='';try{k=(localStorage.getItem(HK)||'').trim()}catch(e){}if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k))k='';
+ return k?{http:'https://mainnet.helius-rpc.com/?api-key='+k,ws:'wss://mainnet.helius-rpc.com/?api-key='+k,key:1}:{http:'https://api.mainnet-beta.solana.com',ws:'wss://api.mainnet-beta.solana.com',key:0}}
+// HTTP with honest error reporting: "rate-limited" ONLY on a real 429, exponential backoff + jitter
+let backoff=0,stats={req:0,r429:0,err:0};
+async function rpc(mt,pr){if(backoff>Date.now())await sleep(backoff-Date.now());stats.req++;
+ let r;try{r=await fetch(rpcUrls().http,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})})}catch(e){stats.err++;feed('dn','network error: '+e.message);return null}
+ if(r.status===429){stats.r429++;const n=(rpc.n=(rpc.n||0)+1);backoff=Date.now()+Math.min(30000,1000*2**Math.min(n,5))+Math.random()*1000;feed('dn','rate-limited (429) — backing off '+Math.round((backoff-Date.now())/1000)+'s');return null}
+ rpc.n=0;if(!r.ok){stats.err++;feed('dn','HTTP '+r.status);return null}const j=await r.json();if(j.error){stats.err++;feed('dn','RPC error: '+j.error.message);return null}return j.result}
+function feed(cls,msg){const e=$('#feedSt');if(e)e.innerHTML='<span class="'+cls+'">'+msg+'</span>'}
+
+let sock=null,subMap={},pendingSubs=[],poolKind='',calib={r:[],ok:null,next:0},spike=null,reconnects=0;
+// guard against the PREVIOUS live price, never against DexScreener (#1): a >2x jump is held one tick;
+// confirmed by the next reading -> real move (accept); reverts -> spike (discard); unconfirmed 3s -> accept.
+function acceptLive(p,src){if(!(p>0))return;const now=Date.now();
+ if(!TRUSTED.has(poolKind)){ // decoded/unknown pools: loose structural check vs DexScreener, re-checked every 60s if it fails (#2)
+  if(calib.ok!==true){if(calib.ok===false&&now<calib.next)return;if(calib.ok===false){calib={r:[],ok:null,next:0}}
+   if(!dsSol)return;calib.r.push(p/dsSol);if(calib.r.length<5){live.msg='checking pool reading '+calib.r.length+'/5';return}
+   const s=calib.r.slice().sort((a,b)=>a-b),m=s[2];calib.m=m;calib.ok=m>0.7&&m<1.43;if(!calib.ok){calib.next=now+60000;live.ok=false;live.msg=src+' reading is '+m.toFixed(2)+'x DexScreener — decoder mismatch, retrying in 60s';sched(false);return}}}
+ if(live.p&&live.ok){const r=p/live.p;
+  if(r>2||r<0.5){if(!spike){spike={p,t:now};return}const c=p/spike.p;if(c>0.8&&c<1.25||now-spike.t>3000){spike=null}else if(r>0.8&&r<1.25){spike=null}else{spike={p,t:now};return}}
+  else spike=null}
+ live={p,at:now,src,ok:true,msg:''};pickPrice();sched(false);pushSpark(p)}
+let spark=[];function pushSpark(p){spark.push(p);if(spark.length>150)spark.shift()}
+
+async function connect(){
+ if(!pair)return;const u=rpcUrls();if(!u.key){feed('dn','needs Helius key ↓');live.msg='add a Helius key for live price';sched(false);return}
+ try{sock&&(sock.onclose=null,sock.close())}catch(e){}
+ // 1) work out the pool type and what to subscribe to
+ const ai=await rpc('getAccountInfo',[pair.pairAddress,{encoding:'base64'}]);if(!ai||!ai.value){live.msg='pool account not found';sched(false);return setTimeout(connect,10000)}
+ poolKind=PROG[ai.value.owner]||'unknown pool';const d=u8(ai.value.data[0]);let decode=null,acct=[pair.pairAddress],vault=null;
+ const qc=()=>{const pn=+pair.priceNative||0;return pn&&dsSol?dsSol/pn:0}; // SOL per quote token (1 for SOL pairs)
+ if(poolKind==='pump.fun curve'){decode=dd=>{const vt=Number(u64(dd,8)),vs=Number(u64(dd,16));return vt?(vs/1e9)/(vt/1e6):0}} // virtual reserves
+ else if(['Orca','Raydium CLMM','Meteora DLMM'].includes(poolKind)){let mA,mB;
+  if(poolKind==='Orca'){mA=b58(d.slice(101,133));mB=b58(d.slice(181,213))}else if(poolKind==='Raydium CLMM'){mA=b58(d.slice(73,105));mB=b58(d.slice(105,137))}else{mA=b58(d.slice(88,120));mB=b58(d.slice(120,152))}
+  if(mA!==ca&&mB!==ca){live.msg='pool does not contain this token';sched(false);return}
+  const ms=await rpc('getMultipleAccounts',[[mA,mB],{encoding:'jsonParsed'}]);if(!ms)return setTimeout(connect,5000);const dA=ms.value[0].data.parsed.info.decimals,dB=ms.value[1].data.parsed.info.decimals;
+  decode=dd=>{let pAB;if(poolKind==='Meteora DLMM'){const v=new DataView(dd.buffer,dd.byteOffset);pAB=Math.pow(1+v.getUint16(80,true)/1e4,v.getInt32(76,true))*Math.pow(10,dA-dB)}else{const sp=Number(u128(dd,poolKind==='Orca'?65:253))/2**64;pAB=sp*sp*Math.pow(10,dA-dB)}return (mA===ca?pAB:1/pAB)*qc()}}
+ else{ // vault pools: quote vault ÷ base vault
+  let tv,sv;if(poolKind==='PumpSwap'){const bm=b58(d.slice(43,75));tv=b58(d.slice(139,171));sv=b58(d.slice(171,203));if(bm!==ca){[tv,sv]=[sv,tv]}}
+  else{const mk=rc&&(rc.markets||[]).find(x=>x.pubkey===pair.pairAddress);if(mk&&mk.liquidityA&&mk.liquidityB){const bA=mk.mintA===ca;tv=bA?mk.liquidityA:mk.liquidityB;sv=bA?mk.liquidityB:mk.liquidityA}}
+  if(!tv){live.msg=rc?'can\'t find this pool\'s vaults ('+poolKind+')':'waiting for RugCheck pool data';sched(false);if(!rc)return;return}
+  vault={t:null,s:null};acct=[tv,sv];
+  const rv=async()=>{const r=await rpc('getMultipleAccounts',[[tv,sv],{encoding:'jsonParsed'}]);if(r&&r.value[0]&&r.value[1]){vault.t=+r.value[0].data.parsed.info.tokenAmount.uiAmount;vault.s=+r.value[1].data.parsed.info.tokenAmount.uiAmount;if(vault.t>0)acceptLive(vault.s/vault.t*qc(),poolKind)}};await rv()}
+ if(decode){acceptLive(decode(d),poolKind)}
+ // 2) one websocket: account subs for price + logsSubscribe for the trade feed
+ sock=new WebSocket(u.ws);subMap={};const subs=[];
+ acct.forEach((a,i)=>subs.push({m:'accountSubscribe',p:[a,{encoding:decode?'base64':'jsonParsed',commitment:'processed'}],k:decode?'p':(i===0?'t':'s')}));
+ subs.push({m:'logsSubscribe',p:[{mentions:[pair.pairAddress]},{commitment:'confirmed'}],k:'logs'});
+ sock.onopen=()=>{reconnects=0;subs.forEach((x,i)=>sock.send(JSON.stringify({jsonrpc:'2.0',id:i+1,method:x.m,params:x.p})));feed('up','● live (websocket)');stopPoll();sched(false)};
+ sock.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}if(m.id&&m.result!=null){subMap[m.result]=subs[m.id-1].k;return}
+  if(m.error){feed('dn','websocket error: '+m.error.message);return}
+  const k=m.params&&subMap[m.params.subscription];if(!k)return;
+  if(m.method==='accountNotification'){const v=m.params.result.value;try{if(decode)acceptLive(decode(u8(v.data[0])),poolKind);else{vault[k]=+v.data.parsed.info.tokenAmount.uiAmount;if(vault.t>0&&vault.s>0)acceptLive(vault.s/vault.t*qc(),poolKind)}}catch(x){}}
+  else if(m.method==='logsNotification'){const v=m.params.result.value;if(v&&!v.err)enqueue(v.signature)}};
+ sock.onerror=()=>{};
+ sock.onclose=()=>{live.ok=false;pickPrice();sched(false);reconnects++;feed('dn','websocket dropped — reconnecting ('+reconnects+')');startPoll();setTimeout(connect,Math.min(30000,2000*reconnects)+Math.random()*1000)};
+}
+// trade list: parse at most ~2 tx/sec (newest first); polling ONLY while the websocket is down, every 4s (+jitter)
+let trades=[],seen=new Set(),q=[],busy=false,polling=null,lastSig=null;
+function enqueue(sig){if(seen.has(sig))return;seen.add(sig);q.push(sig);if(q.length>6)q.splice(0,q.length-6);pump()}
+async function pump(){if(busy)return;busy=true;while(q.length){const sig=q.pop();await parseTx(sig);await sleep(500)}busy=false}
+function startPoll(){if(polling)return;polling=setInterval(async()=>{if(sock&&sock.readyState===1)return stopPoll();const r=await rpc('getSignaturesForAddress',[pair.pairAddress,{limit:10}]);if(!r)return;
+ const sigs=r.filter(x=>!x.err).map(x=>x.signature);for(const g of sigs.slice(0,4).reverse())enqueue(g)},4000+Math.random()*1000)}
+function stopPoll(){if(polling){clearInterval(polling);polling=null}}
+async function parseTx(sig){const tx=await rpc('getTransaction',[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:0,commitment:'confirmed'}]);if(!tx)return;
+ try{const signer=tx.transaction.message.accountKeys[0].pubkey||tx.transaction.message.accountKeys[0];
+ const bal=(a,mint)=>(a||[]).filter(b=>b.mint===mint&&b.owner===signer).reduce((s,b)=>s+(+b.uiTokenAmount.uiAmount||0),0);
+ const dTok=bal(tx.meta.postTokenBalances,ca)-bal(tx.meta.preTokenBalances,ca);if(!dTok)return;
+ let dSol=Math.abs((tx.meta.postBalances[0]-tx.meta.preBalances[0]+tx.meta.fee)/1e9+(bal(tx.meta.postTokenBalances,WSM)-bal(tx.meta.preTokenBalances,WSM)));
+ const est=Math.abs(dTok)*(priceSol||dsSol);let approx=false;if(est&&(dSol<est*0.5||dSol>est*2)){dSol=est;approx=true}
+ trades.unshift({t:(tx.blockTime||Date.now()/1000)*1000,side:dTok>0?'BUY':'SELL',tok:Math.abs(dTok),sol:dSol,approx,w:signer,sig});if(trades.length>100)trades.pop();
+ if(tab==='live')sched(true)}catch(e){}}
+
+// wash-trading caution (#14): ignore dust (<0.01 SOL), need 20+ real trades, one wallet ≥50% of trades AND ≥50% of SOL volume
+function washInfo(){const real=trades.slice(0,60).filter(x=>!x.approx&&x.sol>=0.01);if(real.length<20)return null;const c={},v={};let tot=0;
+ real.forEach(x=>{c[x.w]=(c[x.w]||0)+1;v[x.w]=(v[x.w]||0)+x.sol;tot+=x.sol});const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];
+ if(top[1]/real.length>=0.5&&v[top[0]]/tot>=0.5)return {w:top[0],n:top[1],of:real.length,vol:v[top[0]]/tot,text:'one wallet made '+top[1]+'/'+real.length+' real trades ('+Math.round(v[top[0]]/tot*100)+'% of volume)'};return null}
+function drawLive(el){const w=washInfo();
+ const warn=w?'<div style="padding:6px;color:var(--y);font-weight:700">⚠️ Caution: '+w.text+' — wallet '+w.w.slice(0,4)+'…'+w.w.slice(-4)+'. Volume may be inflated by one trader/bot. Not a sell signal on its own.</div>':'';
+ const pts=spark;let sp='';if(pts.length>=3){const lo=Math.min(...pts),hi=Math.max(...pts),W=600,H=70,X=i=>i/(pts.length-1)*W,Y=v=>hi===lo?H/2:H-4-(v-lo)/(hi-lo)*(H-8);sp='<div class="muted" style="font-size:11px">⚡ Live on-chain price (last '+pts.length+' updates)</div><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:70px;background:#0e1118;border-radius:6px"><polyline fill="none" stroke="'+(pts[pts.length-1]>=pts[0]?'#2fe0a5':'#ff4d6a')+'" stroke-width="2" points="'+pts.map((x,i)=>X(i).toFixed(1)+','+Y(x).toFixed(1)).join(' ')+'"/></svg>'}
+ el.innerHTML=sp+warn+'<table><tr><th>Age</th><th>Side</th><th>SOL</th><th>Tokens</th><th>Wallet</th></tr>'+(trades.length?trades.slice(0,60).map(x=>{const a=Math.round((Date.now()-x.t)/1000);return `<tr><td>${a<60?a+'s':Math.round(a/60)+'m'}</td><td class="${x.side==='BUY'?'up':'dn'}">${x.side}</td><td>${(x.approx?'~':'')+x.sol.toFixed(3)}</td><td>${fmt(x.tok)}</td><td><a target=_blank href="https://solscan.io/tx/${x.sig}">${x.w.slice(0,4)}…${x.w.slice(-4)}</a></td></tr>`}).join(''):'<tr><td colspan=5 class="muted">Waiting for trades… (quiet coins may take a while)</td></tr>')+'</table>'}
 
 let cm=new Date();cm.setDate(1);
 function drawCal(el){const y=cm.getFullYear(),m=cm.getMonth(),days=new Date(y,m+1,0).getDate(),first=new Date(y,m,1).getDay(),by={};
  st.hist.filter(h=>h.side==='SELL'&&h.pnl!=null).forEach(h=>{const d=new Date(h.t);if(d.getFullYear()===y&&d.getMonth()===m)by[d.getDate()]=(by[d.getDate()]||0)+h.pnl});
  const tot=Object.values(by).reduce((a,b)=>a+b,0),wins=Object.values(by).filter(v=>v>0).length,losses=Object.values(by).filter(v=>v<0).length;
  let g='<div class="row" style="padding:4px 0"><a href="#" id="cp">◀</a><b>'+cm.toLocaleString(undefined,{month:'long',year:'numeric'})+'</b><a href="#" id="cn">▶</a></div>';
- g+='<div class="muted">Realized PnL: <b class="'+(tot>=0?'up':'dn')+'">'+(tot>=0?'+':'')+tot.toFixed(3)+' SOL</b> · green days '+wins+' · red days '+losses+'</div><div class="cal">';
+ g+='<div class="muted">Realized PnL this month: <b class="'+(tot>=0?'up':'dn')+'">'+(tot>=0?'+':'')+tot.toFixed(3)+' SOL</b> · green days '+wins+' · red days '+losses+'</div><div class="cal">';
  g+=['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>'<div class="h">'+d+'</div>').join('');
  for(let i=0;i<first;i++)g+='<div style="visibility:hidden"></div>';
- for(let d=1;d<=days;d++){const v=by[d];g+='<div class="'+(v>0?'w':v<0?'l':'')+'">'+d+(v!=null?'<b class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v.toFixed(2)+'</b>':'')+'</div>'}
- el.innerHTML=g+'</div>';$('#cp').onclick=e=>{e.preventDefault();cm.setMonth(cm.getMonth()-1);drawPane()};$('#cn').onclick=e=>{e.preventDefault();cm.setMonth(cm.getMonth()+1);drawPane()}}
-setSide('buy');draw();
+ for(let d=1;d<=days;d++){const v=by[d];g+='<div class="'+(v>0?'w':v<0?'l':'')+'">'+d+(v!=null?'<b class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v.toFixed(3)+'</b>':'')+'</div>'}
+ el.innerHTML=g+'</div>';$('#cp').onclick=e=>{e.preventDefault();cm.setMonth(cm.getMonth()-1);drawPane(true)};$('#cn').onclick=e=>{e.preventDefault();cm.setMonth(cm.getMonth()+1);drawPane(true)}}
+
+// ---------- Helius key box ----------
+$('#hk').value=(()=>{try{return localStorage.getItem(HK)||''}catch(e){return ''}})();
+$('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){toast('That is not a Helius API key (should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');return}
+ try{localStorage.setItem(HK,v)}catch(e){};toast(v?'Helius key saved':'Key removed');connect()};
+setSide('buy');sched(true);
+
 </script></body></html>

@@ -6,6 +6,7 @@
 .top{display:flex;align-items:center;gap:12px;margin-bottom:12px}.logo{font-size:20px;font-weight:800;letter-spacing:.5px;background:linear-gradient(90deg,#9b8cff,#2fe0a5);-webkit-background-clip:text;color:transparent}
 .bar{display:flex;gap:8px;flex-wrap:wrap}.bar textarea{min-width:100%}textarea{flex:1;height:46px;resize:vertical;background:var(--p);color:var(--t);border:1px solid var(--b);border-radius:12px;padding:12px;font:13px ui-monospace,monospace;outline:none}textarea:focus{border-color:var(--a);box-shadow:0 0 0 3px #7c6cff22}
 .btn{background:linear-gradient(135deg,#7c6cff,#5a4bff);color:#fff;border:0;border-radius:12px;padding:0 22px;font-weight:700;cursor:pointer}.muted{color:var(--m);font-size:12px}
+.sum{padding:6px 14px;font-size:13px;font-weight:600;border-bottom:1px solid var(--b)}.sum.AVOID{color:#ff4d6a;background:#ff4d6a12}.sum.RISKY{color:#ffbb33;background:#ffbb3310}.sum.PASS{color:#2fe0a5;background:#2fe0a50d}
 .card{background:linear-gradient(180deg,var(--p),#0c1017);border:1px solid var(--b);border-radius:16px;margin-top:14px;overflow:hidden;animation:in .25s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}}
 .hd{display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--b)}
@@ -56,6 +57,12 @@ const L={
  'Dev still holding':'The creator still has a bag and can dump it on you. Lower is safer.',
  'Single big holder':'One wallet owns a huge % of supply. One click from them can crash the chart.'};
 const MUT=rc=>!!(rc&&rc.tokenMeta&&(rc.tokenMeta.mutable||(rc.tokenMeta.updateAuthority&&!/^1{20,}/.test(rc.tokenMeta.updateAuthority))));
+const SUMD={};
+function summary(d){const r=d.reasons,two=r.slice(0,2).join(' and ');
+ if(d.v==='AVOID')return 'Danger: '+two+' — likely fake or a rug. Don\'t trade it.';
+ const t=d.en==='LATE'?' It already pumped hard — don\'t chase.':d.en==='FALLING'?' Price is falling right now — wait.':'';
+ if(d.v==='RISKY')return 'Caution: '+two+'.'+t+(t?'':' Small size only, check Bubblemaps first.');
+ return 'Looks clean on paper: no red flags from RugCheck, DexScreener or the wallet check.'+(t||' Still check Bubblemaps before buying.')}
 const PAIR={},HOLD={},HIST='qs_history';
 const EXP={'Liquidity':'Money in the trading pool. Low = you may not be able to sell without crashing the price.','Liq / MC':'Liquidity as % of market cap. Under ~5% is thin; healthy coins are often 8%+.','Volume 24h':'Total traded in 24h. Can be faked by bots — compare with fees and holders.','Holders':'Wallets holding the coin. Way too many holders for a small market cap = fake wallets.','Top 10':'% of supply held by the 10 biggest wallets. Under 25% is safer.','LP Locked':'% of liquidity locked/burned so the dev can\'t pull it. Want 80-100%.','Insider nets':'Groups of linked wallets (same funder). High = bundled launch, they dump on you.','Dev holds':'% the creator still holds. Over 5% = dump risk.','Mint auth':'If ON, dev can print new tokens. Want Revoked.','Freeze auth':'If ON, dev can freeze your wallet so you can\'t sell. Want Revoked.','Tax':'Fee on every buy/sell going to the dev. Want 0%.','Metadata':'If Mutable, dev can change name/image/links later.','Avg trade':'Volume ÷ number of trades. Tons of tiny trades = bots faking volume.','Holders / $1K MC':'Real coins rarely have more than ~50 holders per $1K of market cap. Way more = farmed fake wallets.'};
 const risk=(name,hard,extra)=>`<span class="risk ${hard?'hard':''}" data-t="${esc(name)}" data-x="${esc(extra||L[name]||'Flag from RugCheck. Open RC for details.')}">${hard?'⛔':'⚠️'} ${esc(name)}</span>`;
@@ -108,6 +115,13 @@ const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p
  const q=p?(p.quoteToken||{}).symbol:'',stock=q&&!['SOL','WSOL','USDC','USDT','USD1'].includes(q.toUpperCase());
  const ch=(p&&p.priceChange)||{},tx=(p&&p.txns&&p.txns.h24)||{},bp=tx.buys+tx.sells?tx.buys/(tx.buys+tx.sells)*100:50;
  const cls=(bad,good)=>bad?'bad':good?'good':'';
+ // plain-English summary (rule-based, no AI): biggest risk first
+ const RW={'No market':'no trading pool exists','Already rugged':'RugCheck says it already rugged','Mint authority ON':'the dev can still mint new tokens','Freeze authority ON':'the dev can freeze your wallet','No real liquidity':'almost no liquidity ($'+k(liq)+') behind a $'+k(mc)+' market cap',
+  'Top 10 hold too much':'the top 10 wallets hold '+(top10||0).toFixed(0)+'%','Fake wallets':'holders look farmed ('+Math.round(hpk)+' per $1K of market cap)','Insider networks':(ins||0)+' insider wallet networks','Transfer tax':tax+'% transfer tax','Botted volume':'volume looks botted (avg trade $'+avgTr.toFixed(0)+')',
+  'Low liquidity':'liquidity is thin ($'+k(liq)+')','LP not locked':'only '+(lp||0).toFixed(0)+'% of liquidity is locked','Single big holder':'one wallet holds '+single.toFixed(0)+'%','Dev still holding':'the dev still holds '+(cb||0).toFixed(1)+'%','Mutable metadata':'the dev can still change the name/image','Brand new (<2h)':'it is under 2 hours old'};
+ const reasons=[...names.filter(n=>n.startsWith('⛔')),...names.filter(n=>!n.startsWith('⛔'))].map(n=>n.replace(/^(⛔|⚠️) /,'')).map(n=>RW[n]||n.toLowerCase());
+ SUMD[m]={v,en,reasons};const sumTxt=summary(SUMD[m]);
+ try{localStorage.setItem('qs_card_'+m,JSON.stringify({t:Date.now(),rug:v==='PASS'?'NOT A RUG':v==='RISKY'?'RISKY':'RUG RISK',entry:EN[en][0].replace(/^\S+ /,''),flags:names.join(' | ')||'none',tips:'pending',wallet:'pending'}))}catch(e){}
  const rugWhy=names.length?names.join(' · '):'No red flags from RugCheck/DexScreener. Wallet check and Bubblemaps still matter.';
  try{const hst=JSON.parse(localStorage.getItem(HIST)||'[]');hst.unshift({t:Date.now(),ca:m,sym:p?p.baseToken.symbol:'?',mc:Math.round(mc),liq:Math.round(liq),holders,top10,ins,rug:v,entry:en,flags:names.join(' | ')});localStorage.setItem(HIST,JSON.stringify(hst.slice(0,2000)))}catch(e){}
  const S=(l,val,c='')=>`<div class="st ${c}" data-t="${l}" data-x="${esc(EXP[l]||'')}"><span>${l}</span><b>${val}</b></div>`;
@@ -115,7 +129,7 @@ const t24=(p&&p.txns&&p.txns.h24)||{},nTx=(t24.buys||0)+(t24.sells||0),vol=(p&&p
  return `<div class="card"><div class="hd">${img?`<img src="${esc(img)}">`:'<img>'}<div><div class="nm">${esc(p?p.baseToken.symbol:'?')}<small>${esc(p?p.baseToken.name:'')}</small></div>
  <div style="margin-top:4px"><span class="tag">${p?esc(p.dexId):'no pair'}</span><span class="tag">${p?esc(p.baseToken.symbol)+'/'+esc(q):''}</span>${stock?`<span class="tag" style="color:#9b8cff">STOCK-PAIRED: ${esc(q)}</span>`:''}${p&&p.pairCreatedAt?`<span class="tag">age ${age(p.pairCreatedAt)}</span>`:''}<span class="tag" title="click to copy" style="cursor:pointer" onclick="navigator.clipboard.writeText('${m}')">${m.slice(0,4)}…${m.slice(-4)} ⧉</span></div></div>
  <div class="ver"><div style="font-size:20px;font-weight:800">$${k(mc)}</div><div class="muted">price $${p?(+p.priceUsd<0.01?(+p.priceUsd).toExponential(2):(+p.priceUsd).toFixed(4)):'-'}</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="pill ${v} risk" id="rp_${m}" style="margin:0" data-t="Rug check" data-x="${esc(rugWhy)}">🛡 ${v==='PASS'?'NOT A RUG':v==='RISKY'?'RISKY':'RUG RISK'}</span><span class="pill ${EN[en][1]} risk" style="margin:0;background:none;border:1px solid currentColor" data-t="Entry timing: ${EN[en][0]}" data-x="${esc(ex)}">${EN[en][0]}</span></div></div>
- <div class="body"><div class="gauge">${gauge(safety,v==='PASS'?'SAFE':v==='RISKY'?'CAUTION':'DANGER',col)}<div class="muted">safety score<span class="q" data-t="Safety score" data-x="Starts at 100. Each ⛔ takes 40, each ⚠️ takes 12. It only measures rug risk — not whether price will go up.">?</span></div></div>
+ <div class="sum ${v}" id="sum_${m}">${esc(sumTxt)}</div><div class="body"><div class="gauge">${gauge(safety,v==='PASS'?'SAFE':v==='RISKY'?'CAUTION':'DANGER',col)}<div class="muted">safety score<span class="q" data-t="Safety score" data-x="Starts at 100. Each ⛔ takes 40, each ⚠️ takes 12. It only measures rug risk — not whether price will go up.">?</span></div></div>
  <div><div class="grid">${S('Liquidity','$'+k(liq),cls(liq<R.minLiq,liq>=R.minLiq))}${S('Liq / MC',mc?(liq/mc*100).toFixed(1)+'%':'-',cls(mc&&liq/mc<.05,mc&&liq/mc>=.08))}${S('Volume 24h','$'+k((p&&p.volume||{}).h24))}${S('Holders',k(holders),cls(holders!=null&&holders<100,holders>=500))}
  ${S('Top 10',top10==null?'-':top10.toFixed(1)+'%',cls(top10>R.maxTop10,top10!=null&&top10<=R.maxTop10))}${S('LP Locked',lp==null?'-':lp.toFixed(0)+'%',cls(lp!=null&&lp<R.minLP,lp>=R.minLP))}${S('Insider nets',ins??'-',cls(ins>R.maxIns,ins!=null&&ins<=R.maxIns))}${S('Avg trade',avgTr?'$'+avgTr.toFixed(0):'-',cls(nTx>3000&&avgTr<35,avgTr>=60))}${S('Holders / $1K MC',hpk?hpk.toFixed(0):'-',cls(hpk>50,hpk&&hpk<=50))}${S('Dev holds',cb==null?'-':cb.toFixed(1)+'%',cls(cb>5,cb!=null&&cb<=5))}
  ${S('Mint auth',rc?(rc.mintAuthority?'ON':'Revoked'):'-',cls(rc&&rc.mintAuthority,rc&&!rc.mintAuthority))}${S('Freeze auth',rc?(rc.freezeAuthority?'ON':'Revoked'):'-',cls(rc&&rc.freezeAuthority,rc&&!rc.freezeAuthority))}${S('Tax',tax+'%',cls(tax>0,tax===0))}${S('Metadata',rc&&rc.tokenMeta?(MUT(rc)?'Mutable':'Locked'):'-',cls(rc&&MUT(rc),rc&&rc.tokenMeta&&!MUT(rc)))}</div>
@@ -128,7 +142,7 @@ async function go(append){const ms=[...new Set($('#in').value.match(/(?<![0-9a-z
  if(!append)$('#out').innerHTML='';const t0=performance.now();let done=0,i=0;
  const rank={PASS:0,RISKY:1,AVOID:2};
  const place=(h,m)=>{const d=document.createElement('div');d.innerHTML=h;const c=d.firstElementChild;const r=rank[c.querySelector('.pill').classList[1]];c.dataset.r=r;
-  if(r<2)wq.push(m);else{const w=c.querySelector('[id^=wc_]');if(w)w.textContent='🔍 Deep check skipped — already failed'}setTimeout(()=>{wpump();wpump();wpump()});const after=[...$('#out').children].find(x=>+x.dataset.r>r);after?$('#out').insertBefore(c,after):$('#out').appendChild(c)};
+  if(r<2)wq.push(m);else{const w=c.querySelector('[id^=wc_]');if(w)w.textContent='🔍 Deep check skipped — already failed';try{const c=JSON.parse(localStorage.getItem('qs_card_'+m)||'{}');c.tips='skipped (already failed)';c.wallet='skipped (already failed)';localStorage.setItem('qs_card_'+m,JSON.stringify(c))}catch(e){}}setTimeout(()=>{wpump();wpump();wpump()});const after=[...$('#out').children].find(x=>+x.dataset.r>r);after?$('#out').insertBefore(c,after):$('#out').appendChild(c)};
  const worker=async()=>{while(i<ms.length){const m=ms[i++];try{place(await one(m),m)}catch(e){}done++;$('#t').textContent=done+'/'+ms.length+' scanned · '+((performance.now()-t0)/1000).toFixed(1)+'s'}};
  await Promise.all(Array.from({length:6},worker))}
 const wq=[];let wbusy=0;
@@ -151,6 +165,9 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
  await tradeCheck(m,rpc,out);
  const bad=cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
  if(bad){const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
+ const wStr=cl.length?cl.map(([,v])=>v.n+'-wallet cluster '+v.p.toFixed(1)+'%').join(', '):'clean ('+fresh+'/'+n+' fresh, no clusters)';
+ try{const d=SUMD[m];if(d){if(bad){d.v='AVOID';if(PAIR[m]&&PAIR[m].noTips)d.reasons.unshift('no real trader paid a tip in the last '+((PAIR[m].fees||{}).kk||'15+')+' trades');cl.filter(([,v])=>v.p>=10).forEach(([,v])=>d.reasons.unshift(v.n+' linked wallets hold '+v.p.toFixed(0)+'%'))}const se=document.getElementById('sum_'+m);if(se){se.textContent=summary(d);se.className='sum '+d.v}}
+  const c=JSON.parse(localStorage.getItem('qs_card_'+m)||'{}');c.tips=(PAIR[m]&&PAIR[m].tipStr)||'n/a';c.wallet=wStr;if(bad)c.rug='RUG RISK';c.t=Date.now();localStorage.setItem('qs_card_'+m,JSON.stringify(c))}catch(e){}
  el.outerHTML=out.length?out.join(''):'<div><span class="clean">🔍 Wallet map looks clean</span> <span class="muted">('+fresh+'/'+n+' fresh, no clusters)</span></div>'}
 const JITO=new Set(['96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5','HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe','Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY','ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49','DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh','ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt','DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL','3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT']);
 async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
@@ -164,7 +181,7 @@ async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
   // token side of the trader (works whether they paid in SOL or wrapped SOL)
   const tb=a=>(a||[]).filter(b=>b.mint===m&&b.owner===signer).reduce((x,b)=>x+(+b.uiTokenAmount.uiAmount||0),0);const dT=tb(t.meta.postTokenBalances)-tb(t.meta.preTokenBalances);
   if(dT!==0)tradeFees.push((prio+tip)/1e9);if(dT>0){buys.push({sz:+dT.toPrecision(2),t:t.blockTime||0});wal[signer]=(wal[signer]||0)+1}}
- const kk=tx.length,tf=tradeFees.sort((a,b)=>a-b),med=tf.length?tf[Math.floor(tf.length/2)]:0;P.fees={avg:med,kk,n:tf.length};
+ const kk=tx.length,tf=tradeFees.sort((a,b)=>a-b),med=tf.length?tf[Math.floor(tf.length/2)]:0;P.fees={avg:med,kk,n:tf.length};P.tipStr=kk>=15?tipped+'/'+kk+' recent trades tipped':'too few trades to judge ('+kk+')';
  // Fees box CUT 2026-10-30: could not tell real from fake (real Dacity/CLAUDIA read as low as fakes). Use Axiom Global Fees Paid by hand.
  if(kk>=15&&tipped===0&&(P.noTips=P.ageH<720,true))out.push(risk('No real-trader tips',P.ageH<720,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
  else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips — real traders present</div>');
@@ -176,7 +193,7 @@ let tm,tip=$('#tip');
 document.addEventListener('mousemove',e=>{const c=e.target.closest('[data-x]');clearTimeout(tm);if(!c){tip.style.display='none';return}
  if(tip.style.display==='block'&&tip._c===c)return;tip.style.display='none';
  tm=setTimeout(()=>{tip._c=c;tip.innerHTML='<b>'+c.dataset.t+'</b><br>'+c.dataset.x;tip.style.left=Math.min(e.clientX+12,innerWidth-350)+'px';tip.style.top=Math.min(e.clientY+14,innerHeight-160)+'px';tip.style.display='block'},400)});
-document.addEventListener('click',e=>{const b=e.target.closest('.pt');if(b)window.open('Paper%20Trade.html?ca='+b.dataset.ca,'papertrade','popup,width=1320,height=860')});
+document.addEventListener('click',e=>{const b=e.target.closest('.pt');if(b)window.open('Paper%20Trade.html?ca='+b.dataset.ca,'papertrade_'+b.dataset.ca,'popup,width=1320,height=860')});
 $('#tr').onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling trending coins…</div>';const ms=[];
  for(const pth of ['/token-boosts/top/v1','/token-boosts/latest/v1','/community-takeovers/latest/v1','/token-profiles/latest/v1']){const a=await f('https://api.dexscreener.com'+pth)||[];
   for(const t of a)if(t.chainId==='solana'&&t.tokenAddress&&!ms.includes(t.tokenAddress))ms.push(t.tokenAddress)}
