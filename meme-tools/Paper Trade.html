@@ -146,9 +146,15 @@ function drawPane(){const el=$('#pane');
 // ===== LIVE on-chain price (fixes DexScreener's 20-40s delay) =====
 // Uses the median of the last 3 exactly-parsed on-chain trades if the newest is <15s old; else DexScreener.
 let dsSol=0,dsUsd=0,livePx=[];
-function applyLive(){const wsOn=vws&&vws.readyState===1&&vBal.t>0;const fresh=livePx.filter(x=>wsOn?x.src==='ws'&&Date.now()-x.at<120000:Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
- if(fresh.length&&dsSol){const r=fresh.slice(0,wsOn?1:3).map(x=>x.p).sort((a,b)=>a-b),med=r[Math.floor(r.length/2)];
-  if(med>dsSol*0.33&&med<dsSol*3){priceSol=med;priceUsd=solUsd?med*solUsd:dsUsd*med/dsSol;if(vl)vl.textContent='$'+(priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4));
+// Pool calibration: "SOL ÷ tokens in the pool" = price ONLY for simple pools (PumpSwap, Raydium AMM, Meteora DAMM).
+// Concentrated-liquidity pools (Orca Whirlpool, Raydium CLMM, Meteora DLMM) read ~2x off (BONK Orca: 1.45e-8 vs 3.05e-8).
+// First 5 readings vs DexScreener: within 4% -> live OK; otherwise live pricing OFF for this coin.
+let calib={r:[],ok:null};
+function calibOk(p){if(calib.ok!==null)return calib.ok;if(!dsSol)return false;calib.r.push(p/dsSol);if(calib.r.length<5)return false;const s=calib.r.slice().sort((a,b)=>a-b),m=s[2];calib.ok=Math.abs(m-1)<0.04;calib.m=m;return calib.ok}
+function applyLive(){if(livePx[0]&&livePx[0].p&&!livePx[0].cal){livePx[0].cal=1;calibOk(livePx[0].p)}const wsOn=vws&&vws.readyState===1&&vBal.t>0;const fresh=livePx.filter(x=>wsOn?x.src==='ws'&&Date.now()-x.at<120000:Date.now()-x.at<15000);const el=document.getElementById('pxs'),vl=document.getElementById('pxv');
+ if(calib.ok===false){if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — this pool type (concentrated liquidity) can\'t be priced live (pool read '+(calib.m||0).toFixed(2)+'x DexScreener)';return false}
+ if(fresh.length&&dsSol&&calib.ok){const r=fresh.slice(0,wsOn?1:3).map(x=>x.p).sort((a,b)=>a-b),med=r[Math.floor(r.length/2)];
+  if(med>dsSol*0.5&&med<dsSol*2){priceSol=med;priceUsd=solUsd?med*solUsd:dsUsd*med/dsSol;if(vl)vl.textContent='$'+(priceUsd<0.01?priceUsd.toExponential(2):priceUsd.toFixed(4));
    if(el){const lag=Math.round((Date.now()-fresh[0].bt)/1000);el.innerHTML='<b class="up">⚡ live on-chain</b> · '+(fresh[0].src==='ws'?'websocket (instant)':'last trade '+lag+'s ago')}return true}}
  if(dsSol){priceSol=dsSol;priceUsd=dsUsd}if(el)el.textContent='DexScreener (~20-40s delay) — no fresh on-chain trade';return false}
 setInterval(()=>{if(pair){applyLive();draw()}},1000);
