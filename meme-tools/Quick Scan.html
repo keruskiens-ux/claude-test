@@ -79,7 +79,7 @@ async function one(m){
   ins=rc.graphInsidersDetected||0;holders=rc.totalHolders;
   tax=((rc.transferFee||{}).pct)||0;cb=rc.creatorBalance!=null&&rc.token&&rc.token.supply?rc.creatorBalance/rc.token.supply*100:null;
   if(rc.rugged)add('Already rugged',1);if(rc.mintAuthority)add('Mint authority ON',1);if(rc.freezeAuthority)add('Freeze authority ON',1);
-  if(lp<R.minLP)add('LP not locked',0,'Only '+lp.toFixed(0)+'% of liquidity is locked/burned. '+L['LP not locked']);
+  if(lp<R.minLP&&!OLD)add('LP not locked',0,'Only '+lp.toFixed(0)+'% of liquidity is locked/burned. '+L['LP not locked']);
   if(top10>(OLD?60:R.maxTop10))add('Top 10 hold too much',!OLD&&top10>=90,'Top 10 wallets hold '+top10.toFixed(1)+'%. '+L['Top 10 hold too much']);
   if(single>20&&!OLD)add('Single big holder',0,'Largest wallet holds '+single.toFixed(1)+'%. '+L['Single big holder']);
   const insR=holders?ins/holders*100:0;if(ins>R.maxIns&&!(OLD||insR<0.5))add('Insider networks',insR>2&&ins>15,ins+' insider networks found. '+L['Insider networks']);
