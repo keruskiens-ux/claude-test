@@ -140,7 +140,7 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
  if(n&&fresh/n>=.4)out.push(risk('Fresh wallets',1,fresh+' of '+n+' top holders are brand-new wallets (under 10 transactions ever). One person spreading supply across new wallets to look like real buyers, then dumping.'));
  cl.forEach(([f,v])=>out.push(risk('Cluster: '+v.n+' wallets, '+v.p.toFixed(1)+'%',v.p>=10,v.n+' top holders were all funded by the same wallet ('+f.slice(0,4)+'…'+f.slice(-4)+'). That\'s a Bubblemaps cluster — likely one person. They hold '+v.p.toFixed(1)+'% together and can dump at once. Over ~10% = skip.')));
  await tradeCheck(m,rpc,out);
- const bad=(n&&fresh/n>=.4)||cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].feesBad);
+ const bad=(n&&fresh/n>=.4)||cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
  if(bad){const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
  el.outerHTML=out.length?out.join(''):'<div><span class="clean">🔍 Wallet map looks clean</span> <span class="muted">('+fresh+'/'+n+' fresh, no clusters)</span></div>'}
 const JITO=new Set(['96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5','HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe','Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY','ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49','DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh','ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt','DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL','3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT']);
@@ -160,7 +160,7 @@ async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
  const est24=P.fees.avg*P.nTx,perM=P.mc?est24/(P.mc/1e6):0;P.fees.perM=perM;
  const fe=document.getElementById('fe_'+m);if(fe)fe.innerHTML='<span>Fees 24h est.</span><b class="'+(P.ageH<720&&perM<2?'bad':perM>=10?'good':'')+'">'+(est24<1?est24.toFixed(2):est24.toFixed(0))+' SOL</b>';
  if(kk>=15&&P.ageH>=1&&P.ageH<720&&P.mc>50000&&perM<2&&true)out.push(risk('Low fees paid',0,'Estimated only '+est24.toFixed(2)+' SOL of priority fees/tips in 24h on a $'+k(P.mc)+' coin ('+perM.toFixed(2)+' SOL per $1M MC). Real traders pay fees; wash-trading bots don\'t. Same idea as Axiom "Global Fees Paid" (checklist: under ~10 per $1M = fake). Only used on coins under 30 days old — big old coins trade on many pools so this number looks low for them.'));
- if(kk>=15&&tipped===0)out.push(risk('No real-trader tips',0,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
+ if(kk>=15&&tipped===0&&(P.noTips=P.ageH<720,true))out.push(risk('No real-trader tips',P.ageH<720,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
  else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips — real traders present</div>');
  // staircase: same buy size over and over, or buys on a timer
  const cnt={};buys.forEach(b=>cnt[b.sz]=(cnt[b.sz]||0)+1);const rep=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
