@@ -44,7 +44,7 @@ const age=ms=>{const h=(Date.now()-ms)/36e5;return h<1?Math.round(h*60)+'m':h<48
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const L={
  'No market':'There is no trading pool, so you can\'t sell. Usually a dead or fake CA. Verify the contract from the coin\'s own X/site.',
- 'Low liquidity':'Thin pool = small sells crash the price and you may not get out. Liquidity should be 5-10%+ of market cap.',
+ 'No real liquidity':'Almost no money in the pool compared to the market cap, so the price is not real and you could not sell.','Low liquidity':'Thin pool = small sells crash the price and you may not get out. Liquidity should be 5-10%+ of market cap.',
  'Already rugged':'RugCheck saw the liquidity pulled or a mass dump. It\'s over — don\'t buy the "dip".',
  'Mint authority ON':'The dev can create new tokens anytime and sell them into your buys, crashing price to zero. Safe coins have it revoked.',
  'Freeze authority ON':'The dev can freeze your wallet so you can buy but never sell (a honeypot). Safe coins have it revoked.',
@@ -70,15 +70,15 @@ async function one(m){
  const risks=[],names=[];let hard=0,soft=0;const add=(n,h,x)=>{risks.push(risk(n,h,x));names.push((h?'⛔ ':'⚠️ ')+n);h?hard++:soft++};
  const liq=p?(p.liquidity||{}).usd||0:0,mc=p?(p.marketCap||p.fdv||0):0;
  const AGE=p&&p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/36e5:0,OLD=AGE>24*30;
- if(!p)add('No market',1);else if(liq<R.minLiq)add('Low liquidity',0);
+ if(!p)add('No market',1);else if(mc>100000&&liq<Math.max(1000,mc*0.002))add('No real liquidity',1,'Pool holds only $'+k(liq)+' against a $'+k(mc)+' market cap ('+(mc?(liq/mc*100).toFixed(2):0)+'%). You cannot sell anything meaningful — the market cap is fake. Real coins (even BONK across many pools) are 0.4%+.');else if(liq<R.minLiq)add('Low liquidity',0);
  let top10=null,lp=null,ins=null,holders=null,tax=0,cb=null,single=0;
  if(rc){top10=(rc.topHolders||[]).slice(0,10).reduce((s,h)=>s+(h.pct||0),0);single=Math.max(0,...(rc.topHolders||[]).map(h=>h.pct||0));
   lp=Math.max(0,...(rc.markets||[]).map(x=>(x.lp||{}).lpLockedPct||0));ins=rc.graphInsidersDetected||0;holders=rc.totalHolders;
   tax=((rc.transferFee||{}).pct)||0;cb=rc.creatorBalance!=null&&rc.token&&rc.token.supply?rc.creatorBalance/rc.token.supply*100:null;
   if(rc.rugged)add('Already rugged',1);if(rc.mintAuthority)add('Mint authority ON',1);if(rc.freezeAuthority)add('Freeze authority ON',1);
   if(lp<R.minLP)add('LP not locked',0,'Only '+lp.toFixed(0)+'% of liquidity is locked/burned. '+L['LP not locked']);
-  if(top10>(OLD?60:R.maxTop10))add('Top 10 hold too much',0,'Top 10 wallets hold '+top10.toFixed(1)+'%. '+L['Top 10 hold too much']);
-  if(single>20)add('Single big holder',0,'Largest wallet holds '+single.toFixed(1)+'%. '+L['Single big holder']);
+  if(top10>(OLD?60:R.maxTop10))add('Top 10 hold too much',!OLD&&top10>=90,'Top 10 wallets hold '+top10.toFixed(1)+'%. '+L['Top 10 hold too much']);
+  if(single>20&&!OLD)add('Single big holder',0,'Largest wallet holds '+single.toFixed(1)+'%. '+L['Single big holder']);
   const insR=holders?ins/holders*100:0;if(ins>R.maxIns&&!(OLD||insR<0.5))add('Insider networks',insR>2&&ins>15,ins+' insider networks found. '+L['Insider networks']);
   if(tax>0)add('Transfer tax',tax>5,tax+'% tax. '+L['Transfer tax']);
   if(rc.tokenMeta&&rc.tokenMeta.mutable&&!OLD)add('Mutable metadata',0);
@@ -159,15 +159,15 @@ async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
  // ≈ Axiom "Global Fees Paid": real traders pay priority fees + tips; wash bots pay ~nothing
  const est24=P.fees.avg*P.nTx,perM=P.mc?est24/(P.mc/1e6):0;P.fees.perM=perM;
  const fe=document.getElementById('fe_'+m);if(fe)fe.innerHTML='<span>Fees 24h est.</span><b class="'+(P.ageH<720&&perM<2?'bad':perM>=10?'good':'')+'">'+(est24<1?est24.toFixed(2):est24.toFixed(0))+' SOL</b>';
- if(kk>=15&&P.ageH>=1&&P.ageH<720&&P.mc>50000&&perM<2&&(P.feesBad=perM<0.5&&tipped===0,true))out.push(risk('Low fees paid',perM<0.5&&tipped===0,'Estimated only '+est24.toFixed(2)+' SOL of priority fees/tips in 24h on a $'+k(P.mc)+' coin ('+perM.toFixed(2)+' SOL per $1M MC). Real traders pay fees; wash-trading bots don\'t. Same idea as Axiom "Global Fees Paid" (checklist: under ~10 per $1M = fake). Only used on coins under 30 days old — big old coins trade on many pools so this number looks low for them.'));
+ if(kk>=15&&P.ageH>=1&&P.ageH<720&&P.mc>50000&&perM<2&&true)out.push(risk('Low fees paid',0,'Estimated only '+est24.toFixed(2)+' SOL of priority fees/tips in 24h on a $'+k(P.mc)+' coin ('+perM.toFixed(2)+' SOL per $1M MC). Real traders pay fees; wash-trading bots don\'t. Same idea as Axiom "Global Fees Paid" (checklist: under ~10 per $1M = fake). Only used on coins under 30 days old — big old coins trade on many pools so this number looks low for them.'));
  if(kk>=15&&tipped===0)out.push(risk('No real-trader tips',0,'0 of the last '+kk+' trades paid a priority fee or tip. Real people buying through Axiom/Padre/bots almost always do; dev bots faking volume don\'t.'));
  else if(kk>=15)out.push('<div class="muted">💸 '+tipped+'/'+kk+' recent trades paid tips — real traders present</div>');
  // staircase: same buy size over and over, or buys on a timer
  const cnt={};buys.forEach(b=>cnt[b.sz]=(cnt[b.sz]||0)+1);const rep=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
  let timer=false;if(rep&&rep[1]>=4){const ts=buys.filter(b=>String(b.sz)===rep[0]).map(b=>b.t).sort();const g=ts.slice(1).map((x,i)=>x-ts[i]).filter(x=>x>0);if(g.length>=3){const mu=g.reduce((a,b)=>a+b,0)/g.length,sd=Math.sqrt(g.reduce((a,b)=>a+(b-mu)**2,0)/g.length);timer=sd/mu<0.35}}
  const topW=Object.values(wal).sort((a,b)=>b-a)[0]||0;
- if(rep&&buys.length>=6&&(rep[1]>=Math.max(4,buys.length*.4)||(rep[1]>=4&&timer)))out.push(risk('Staircase bot pattern',0,rep[1]+' of the last '+buys.length+' buys were the exact same size (~'+k_(+rep[0])+' tokens)'+(timer?', spaced on a timer':'')+'. That is a bot drawing a fake "staircase" chart.'));
- else if(buys.length>=6&&topW>=buys.length*.6)out.push(risk('One wallet buying',0,topW+' of the last '+buys.length+' buys came from ONE wallet. Looks like volume, but it is one bot.'));
+ if(P.ageH<720&&rep&&buys.length>=6&&(rep[1]>=Math.max(4,buys.length*.4)||(rep[1]>=4&&timer)))out.push(risk('Staircase bot pattern',0,rep[1]+' of the last '+buys.length+' buys were the exact same size (~'+k_(+rep[0])+' tokens)'+(timer?', spaced on a timer':'')+'. That is a bot drawing a fake "staircase" chart.'));
+ else if(P.ageH<720&&buys.length>=6&&topW>=buys.length*.6)out.push(risk('One wallet buying',0,topW+' of the last '+buys.length+' buys came from ONE wallet. Looks like volume, but it is one bot.'));
 }catch(e){}}
 const k_=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n;
 async function wpump(){if(wbusy>=3||!wq.length)return;wbusy++;await walletCheck(wq.shift());wbusy--;wpump()}
