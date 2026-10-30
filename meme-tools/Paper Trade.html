@@ -280,7 +280,10 @@ async function connect(){
   if(!tv){live.msg=rc?'can\'t find this pool\'s vaults ('+poolKind+')':'waiting for RugCheck pool data';sched(false);if(!rc)return;return}
   vault={t:null,s:null};acct=[tv,sv];
   const rv=async()=>{const r=await rpc('getMultipleAccounts',[[tv,sv],{encoding:'jsonParsed'}]);if(r&&r.value[0]&&r.value[1]){vault.t=+r.value[0].data.parsed.info.tokenAmount.uiAmount;vault.s=+r.value[1].data.parsed.info.tokenAmount.uiAmount;if(vault.t>0)acceptLive(vault.s/vault.t*qc(),poolKind)}};await rv()}
- if(decode){acceptLive(decode(d),poolKind)}
+ if(decode){acceptLive(decode(d),poolKind);
+  // fast check for decoded pools: 4 more direct reads 1s apart (quiet pools may not change for minutes)
+  if(!TRUSTED.has(poolKind))(async()=>{for(let i=0;i<4&&calib.ok===null;i++){await sleep(1000);const a2=await rpc('getAccountInfo',[pair.pairAddress,{encoding:'base64'}]);if(a2&&a2.value)acceptLive(decode(u8(a2.value.data[0])),poolKind)}})()}
+ else if(vault&&!TRUSTED.has(poolKind))(async()=>{for(let i=0;i<4&&calib.ok===null;i++){await sleep(1000);const r=await rpc('getMultipleAccounts',[acct,{encoding:'jsonParsed'}]);if(r&&r.value[0]&&r.value[1]){vault.t=+r.value[0].data.parsed.info.tokenAmount.uiAmount;vault.s=+r.value[1].data.parsed.info.tokenAmount.uiAmount;if(vault.t>0)acceptLive(vault.s/vault.t*qc(),poolKind)}}})();
  // 2) one websocket: account subs for price + logsSubscribe for the trade feed
  sock=new WebSocket(u.ws);subMap={};const subs=[];
  acct.forEach((a,i)=>subs.push({m:'accountSubscribe',p:[a,{encoding:decode?'base64':'jsonParsed',commitment:'processed'}],k:decode?'p':(i===0?'t':'s')}));
