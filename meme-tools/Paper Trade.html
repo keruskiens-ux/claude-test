@@ -107,6 +107,7 @@ async function init(){
  if(!pair)return;
  $('#chart').src='https://dexscreener.com/solana/'+pair.pairAddress+'?embed=1&theme=dark&info=0&trades=0';
  $('#links').innerHTML=`<a target=_blank href="https://v2.bubblemaps.io/map?address=${ca}&chain=solana">Bubblemaps</a> · <a target=_blank href="https://rugcheck.xyz/tokens/${ca}">RugCheck</a> · <a target=_blank href="https://solscan.io/token/${ca}">Solscan</a> · <a target=_blank href="https://gmgn.ai/sol/token/${ca}">GMGN</a>`;
+ {const ageH=pair.pairCreatedAt?(Date.now()-pair.pairCreatedAt)/36e5:99,mc0=pair.marketCap||pair.fdv||0;if(ageH<720&&mc0>0&&mc0<5e6)$('#links').insertAdjacentHTML('beforeend','<div style="margin-top:6px;color:#ffbb33" title="Farmed-holder fakes (like DESSA) pass every free check; their giveaway is almost no real fees. Link only — no login, no buying.">💸 Before a REAL buy: check Global Fees Paid on Axiom (fake if under ~10 SOL per $1M mcap) → <a target=_blank rel=noopener href="https://axiom.trade/meme/'+pair.pairAddress+'">open on Axiom</a></div>')}
  loadRC();connect();setInterval(refresh,3000);setInterval(loadRC,60000);setInterval(trackHiLo,1000);
 }
 
@@ -277,17 +278,20 @@ async function rpc(mt,pr){if(backoff>Date.now())await sleep(backoff-Date.now());
 function feed(cls,msg){const e=$('#feedSt');if(e)e.innerHTML='<span class="'+cls+'">'+msg+'</span>'}
 
 let sock=null,subMap={},pendingSubs=[],poolKind='',calib={r:[],ok:null,next:0},spike=null,reconnects=0;
-// guard against the PREVIOUS live price, never against DexScreener (#1): a >2x jump is held one tick;
-// confirmed by the next reading -> real move (accept); reverts -> spike (discard); unconfirmed 3s -> accept.
+// guard against the PREVIOUS live price, never against DexScreener (#1) — see acceptLive
 function acceptLive(p,src){if(!(p>0))return;const now=Date.now();
  if(!TRUSTED.has(poolKind)){ // decoded/unknown pools: loose structural check vs DexScreener, re-checked every 60s if it fails (#2)
   if(calib.ok!==true){if(calib.ok===false&&now<calib.next)return;if(calib.ok===false){calib={r:[],ok:null,next:0}}
    if(!dsSol)return;calib.r.push(p/dsSol);if(calib.r.length<5){live.msg='checking pool reading '+calib.r.length+'/5';return}
    const s=calib.r.slice().sort((a,b)=>a-b),m=s[2];calib.m=m;calib.ok=m>0.7&&m<1.43;if(!calib.ok){calib.next=now+60000;live.ok=false;live.msg=src+' reading is '+m.toFixed(2)+'x DexScreener — decoder mismatch, retrying in 60s';sched(false);return}}}
+ // session 10 fix: a >2x jump is held at most 0.7s. Next reading also far from the shown price → real move, shown at once.
+ // Next reading back near the shown price → one-tick spike, discarded. No next reading → shown after 0.7s (old code held a rug forever if trading stopped).
  if(live.p&&live.ok){const r=p/live.p;
-  if(r>2||r<0.5){if(!spike){spike={p,t:now};return}const c=p/spike.p;if(c>0.8&&c<1.25||now-spike.t>3000){spike=null}else if(r>0.8&&r<1.25){spike=null}else{spike={p,t:now};return}}
-  else spike=null}
- live={p,at:now,src,ok:true,msg:''};pickPrice();sched(false);pushSpark(p)}
+  if(r>2||r<0.5){if(!spike){spike={p,t:now,src};clearTimeout(spikeT);spikeT=setTimeout(()=>{if(spike){const s=spike;spike=null;showLive(s.p,s.src)}},700);return}
+   spike=null;clearTimeout(spikeT)}
+  else if(spike){spike=null;clearTimeout(spikeT)}}
+ showLive(p,src)}
+let spikeT=0;function showLive(p,src){live={p,at:Date.now(),src,ok:true,msg:''};pickPrice();sched(false);pushSpark(p)}
 let spark=[];function pushSpark(p){spark.push(p);if(spark.length>150)spark.shift()}
 
 let connecting=false;
