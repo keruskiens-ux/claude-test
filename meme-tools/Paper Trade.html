@@ -311,8 +311,15 @@ async function connect_(){
   decode=dd=>{let pAB;if(poolKind==='Meteora DLMM'){const v=new DataView(dd.buffer,dd.byteOffset);pAB=Math.pow(1+v.getUint16(80,true)/1e4,v.getInt32(76,true))*Math.pow(10,dA-dB)}else{const sp=Number(u128(dd,poolKind==='Orca'?65:253))/2**64;pAB=sp*sp*Math.pow(10,dA-dB)}return (mA===ca?pAB:1/pAB)*qc()}}
  else{ // vault pools: quote vault ÷ base vault
   let tv,sv;if(poolKind==='PumpSwap'){const bm=b58(d.slice(43,75));tv=b58(d.slice(139,171));sv=b58(d.slice(171,203));if(bm!==ca){[tv,sv]=[sv,tv]}}
-  else{const mk=rc&&(rc.markets||[]).find(x=>x.pubkey===pair.pairAddress);if(mk&&mk.liquidityA&&mk.liquidityB){const bA=mk.mintA===ca;tv=bA?mk.liquidityA:mk.liquidityB;sv=bA?mk.liquidityB:mk.liquidityA}}
-  if(!tv){live.msg=rc?'can\'t find this pool\'s vaults ('+poolKind+')':'waiting for RugCheck pool data';sched(false);if(!rc)return;return}
+  else{ // session 10: find the vaults ON-CHAIN (works when RugCheck is down): every 32-byte address stored in the pool account (8-byte steps),
+   // read in ONE call; keep token accounts holding this coin / the quote token, biggest balance each, then sanity-check vs DexScreener.
+   try{const qm=(pair.quoteToken||{}).address,keys=[];for(let o=0;o+32<=d.length&&keys.length<100;o+=8){const k=b58(d.slice(o,o+32));if(k&&!keys.includes(k)&&k!==pair.pairAddress)keys.push(k)}
+    const r=await rpc('getMultipleAccounts',[keys,{encoding:'jsonParsed'}]);let bt=null,bs=null;
+    ((r&&r.value)||[]).forEach((a,i)=>{const inf=a&&a.data&&a.data.parsed&&a.data.parsed.type==='account'&&a.data.parsed.info;if(!inf)return;const amt=+inf.tokenAmount.uiAmount||0;
+     if(inf.mint===ca&&(!bt||amt>bt.amt))bt={k:keys[i],amt};if(inf.mint===qm&&(!bs||amt>bs.amt))bs={k:keys[i],amt}});
+    if(bt&&bs&&bt.amt>0){const px=bs.amt/bt.amt*qc(),ok=!dsSol||(px/dsSol>0.5&&px/dsSol<2);if(ok){tv=bt.k;sv=bs.k;live.vsrc='chain'}}}catch(e){}
+   if(!tv){const mk=rc&&(rc.markets||[]).find(x=>x.pubkey===pair.pairAddress);if(mk&&mk.liquidityA&&mk.liquidityB){const bA=mk.mintA===ca;tv=bA?mk.liquidityA:mk.liquidityB;sv=bA?mk.liquidityB:mk.liquidityA;live.vsrc='RugCheck'}}}
+  if(!tv){live.msg='can\'t find this pool\'s vaults on-chain'+(rc?'':' (RugCheck also unavailable)')+' ('+poolKind+') — using DexScreener';sched(false);return}
   vault={t:null,s:null};acct=[tv,sv];
   const rv=async()=>{const r=await rpc('getMultipleAccounts',[[tv,sv],{encoding:'jsonParsed'}]);if(r&&r.value[0]&&r.value[1]){vault.t=+r.value[0].data.parsed.info.tokenAmount.uiAmount;vault.s=+r.value[1].data.parsed.info.tokenAmount.uiAmount;if(vault.t>0)acceptLive(vault.s/vault.t*qc(),poolKind)}};await rv()}
  if(decode){acceptLive(decode(d),poolKind);
@@ -454,6 +461,24 @@ document.getElementById('vFile').onchange=async ev=>{const f=ev.target.files[0];
  if(window.confirm('Restore backup from '+(o.saved||'?')+'?\nWallet: '+(w?w.bal.toFixed(3)+' SOL, '+w.hist.length+' trades':'none')+'\nScan history: '+h.length+' coins\nThis REPLACES what is in this browser now.')){for(const k in o.ls)if(!SKIP.test(k))_set.call(localStorage,k,o.ls[k]);location.reload()}};
 function vmsg(m){if(typeof toast==='function')return toast(m);const d=document.createElement('div');d.textContent=m;d.style.cssText='background:#0f2a22;color:#2fe0a5;padding:6px 10px;border-radius:8px;margin-top:4px';bar.appendChild(d);setTimeout(()=>d.remove(),5000)}
 function alertBar(m){set(V.state);const d=document.createElement('div');d.textContent=m;d.style.cssText='background:#b3122e;color:#fff;padding:6px 10px;border-radius:8px;margin-top:4px';bar.appendChild(d);setTimeout(()=>d.remove(),5000)}
+// ---- accuracy re-checks (session 10): run from EITHER page (Quick Scan or Paper Trade), one window at a time ----
+// session 10: re-check points at 1h (r1), 6h (r6) and 24h (r24) after each scan — same free DexScreener batch call (30 coins per call)
+const CHECKS=[['r1',36e5],['r6',216e5],['r24',864e5]];
+async function recheckAll(){let n=0;for(const [key,ms] of CHECKS)n+=await recheckAt(key,ms);return n}
+async function recheckAt(key,ms){let h;try{h=JSON.parse(localStorage.getItem('qs_history')||'[]')}catch(e){return 0}
+ // a checkpoint is only taken in its own window (e.g. 1h check between 1h and 6h) so "1h later" really means ~1h
+ const nextMs=(CHECKS[CHECKS.findIndex(c=>c[0]===key)+1]||[0,Infinity])[1];
+ const due=h.filter(x=>!x[key]&&x.ca&&Date.now()-x.t>=ms&&(Date.now()-x.t<nextMs||key==='r24'));if(!due.length)return 0;
+ const cas=[...new Set(due.map(x=>x.ca))].slice(0,300),cur={};
+ for(let i=0;i<cas.length;i+=30){const r=await fetch('https://api.dexscreener.com/tokens/v1/solana/'+cas.slice(i,i+30).join(',')).then(r=>r.ok?r.json():null).catch(()=>null);if(r===null)return 0;
+  for(const pr of r){const a=pr.baseToken&&pr.baseToken.address;if(!a)continue;const c=cur[a]||(cur[a]={mc:0,liq:0,n:0});c.mc=Math.max(c.mc,pr.marketCap||pr.fdv||0);c.liq+=(pr.liquidity||{}).usd||0;c.n++}
+  await new Promise(z=>setTimeout(z,400))}
+ let n=0;h=JSON.parse(localStorage.getItem('qs_history')||'[]');for(const x of h){if(x[key]||Date.now()-x.t<ms||!cas.includes(x.ca))continue;const c=cur[x.ca];
+  const mcx=c&&x.mc?c.mc/x.mc:null,lqx=c&&x.liq?c.liq/x.liq:null;
+  x[key]={at:Date.now(),mc:c?Math.round(c.mc):0,liq:c?Math.round(c.liq):0,mcx,lqx,res:!c||!c.n?'GONE':mcx!=null&&mcx<=0.2?'RUGGED':lqx!=null&&lqx<=0.2&&x.liq>1000?'LIQ PULLED':mcx!=null&&mcx>=2?'PUMPED':'ALIVE'};n++}
+ if(n)localStorage.setItem('qs_history',JSON.stringify(h));return n}
+window.mcvRecheck=async force=>{const last=+(localStorage.getItem('qs_recheck_at')||0);if(!force&&Date.now()-last<300000)return 0;_set.call(localStorage,'qs_recheck_at',String(Date.now()));let n=0;try{n=await recheckAll()}catch(e){}if(n)window.vaultSave&&window.vaultSave('recheck');return n};
+setTimeout(()=>window.mcvRecheck(),8000);setInterval(()=>window.mcvRecheck(),600000);
 // ---- start ----
 (async()=>{if(!window.showDirectoryPicker&&!window.__VAULT_TEST_DIR){V.state='unsupported';V.ready=true;draw();return}
  const d=window.__VAULT_TEST_DIR||await iget('dir');if(!d){set('off');V.ready=true;return}V.dir=d;
