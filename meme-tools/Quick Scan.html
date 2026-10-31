@@ -34,7 +34,6 @@
 @media(max-width:1000px){.body{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
 <div class="top"><span class="logo">⚡ QUICK SCAN</span><span class="muted">paste up to 100 Solana CAs · auto-scans on paste · Ctrl+Enter · hover a risk to learn it</span><span class="muted" id="t" style="margin-left:auto"></span></div>
-<div style="margin:0 0 10px;padding:8px 12px;border:1px solid #7a1f30;border-radius:10px;background:#1f0a10;color:#ff8a9c;font-weight:700">🛑 Down 0.5 SOL today? STOP. Close the terminal. Tomorrow is another day.</div>
 <div class="bar"><textarea id="in" placeholder="Paste contract addresses…"></textarea><button class="btn" id="go">Scan</button><button class="btn pf" data-q="sort=created_timestamp&order=DESC&includeNsfw=false" style="background:#1d2433">🆕 Pump New</button><button class="btn pf" data-q="sort=market_cap&order=DESC&complete=false&includeNsfw=false" style="background:#1d2433">🏁 Pump Final Stretch</button><button class="btn pf" data-q="sort=last_trade_timestamp&order=DESC&complete=true&includeNsfw=false" style="background:#1d2433">🚀 Pump Migrated</button><button class="btn gk" data-u="new_pools" style="background:#1d2433">🦎 Gecko New</button><button class="btn gk" data-u="trending_pools" style="background:#1d2433">🦎 Gecko Trending</button><button class="btn" id="hx" title="Download every coin you have scanned" style="background:#232a38">💾 History</button><button class="btn" id="cto" style="background:#1d2433">🤝 DEX CTO</button><button class="btn" id="tr" style="background:linear-gradient(135deg,#2fe0a5,#16b585);color:#032">🔥 DEX Trending</button></div>
 <div style="margin-top:8px" class="muted"><label title="Source buttons skip coins already in your History, so a refresh shows NEW coins"><input type="checkbox" id="hideSeen"> hide coins I already scanned</label> <span id="lpSt" style="margin-left:12px"></span></div>
 <div id="live" style="display:none"></div>
@@ -296,13 +295,13 @@ const DBN='mcv_vault',OS='h';
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);r.onupgradeneeded=()=>r.result.createObjectStore(OS);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const iget=async k=>{try{const d=await idb();return await new Promise(r=>{const q=d.transaction(OS).objectStore(OS).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}};
 const iput=async(k,v)=>{const d=await idb();await new Promise((r,j)=>{const t=d.transaction(OS,'readwrite');t.objectStore(OS).put(v,k);t.oncomplete=r;t.onerror=()=>j(t.error)})};
-const V=window.VAULT={dir:null,state:'init',err:'',lastOk:0,ready:false,saves:0};
+const esc0=x=>String(x).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');const V=window.VAULT={dir:null,state:'init',err:'',lastOk:0,ready:false,saves:0};
 const bar=document.getElementById('vbar');
 const btn=(id,t,tip)=>'<button id="'+id+'" title="'+(tip||'')+'" style="margin-left:6px;background:#fff;color:#000;border:0;border-radius:6px;padding:3px 8px;font-weight:700;cursor:pointer">'+t+'</button>';
 const small=(id,t,tip)=>'<a href="#" id="'+id+'" title="'+(tip||'')+'" style="color:#8ab4ff;margin-left:8px">'+t+'</a>';
 function draw(){
  const ex=small('vExp','Export everything','Download one file with your wallet, every trade, scan history and accuracy data (manual backup)')+small('vImp','Restore from file','Load a file made by Export everything (shows a preview, asks before replacing)');
- if(V.state==='ok'){bar.innerHTML='<span style="background:#0f2a22;border:1px solid #1e6b54;color:#2fe0a5;border-radius:8px;padding:4px 8px;display:inline-block" title="Every scan and trade is written to your Meme Coin Vault/Logs folder">✓ Backed up to vault/Logs '+(V.lastOk?new Date(V.lastOk).toLocaleTimeString():'')+ex+'</span>'}
+ if(V.state==='ok'){bar.innerHTML='<span style="background:#0f2a22;border:1px solid #1e6b54;color:#2fe0a5;border-radius:8px;padding:4px 8px;display:inline-block" title="Every scan and trade is written to your Meme Coin Vault/Logs folder">✓ Backed up to '+esc0(V.dir&&V.dir.name||'vault')+'/Logs '+(V.lastOk?new Date(V.lastOk).toLocaleTimeString():'')+(V.remember?' · ⚠ '+esc0(V.remember):'')+ex+'</span>'}
  else{const why={init:'checking vault folder…',unsupported:"this browser can't write to a folder (use Chrome on PC). Use Export everything / Copy wallet",off:'vault folder not connected',perm:'Chrome needs your OK to keep saving to the vault',fail:'last save FAILED: '+V.err,saving:'saving…'}[V.state]||V.state;
   const act=V.state==='off'?btn('vCon','Connect vault folder','Pick your Meme Coin Vault folder once — every scan and trade then auto-saves to its Logs folder'):V.state==='perm'?btn('vPerm','Allow (1 click)','Chrome asks again after a restart unless you chose "Allow on every visit"'):V.state==='fail'?btn('vRetry','Retry')+btn('vCon','Pick folder again'):'';
   bar.innerHTML='<div style="background:#b3122e;color:#fff;border-radius:8px;padding:7px 10px;font-weight:800;box-shadow:0 0 18px #ff4d6a66">⚠ NOT BACKED UP — '+why+act+ex.replace(/color:#8ab4ff/g,'color:#fff;text-decoration:underline')+'</div>'}
@@ -344,10 +343,15 @@ async function maybeRestore(){if(hasData()||!V.dir)return false;try{const L=awai
   if(t){try{o=JSON.parse(t).ls}catch(e){}}if(!o){const w=await readF(L,'wallet.json');if(w){try{JSON.parse(w);o={papertrade_v1:w}}catch(e){}}}
   if(!o||!Object.keys(o).length)return false;for(const k in o)if(!SKIP.test(k))_set.call(localStorage,k,o[k]);
   sessionStorage.setItem('mcv_restored',Object.keys(o).length);location.reload();return true}catch(e){set('fail','restore failed: '+e.message);return false}}
-async function connect(){try{const d=await window.showDirectoryPicker({id:'memecoinvault',mode:'readwrite',startIn:'documents'});
-  if(!/meme coin vault|^logs$/i.test(d.name)&&!confirmBar('That folder is "'+d.name+'", not "Meme Coin Vault". Use it anyway?'))return;
-  V.dir=d;await iput('dir',d);if(await maybeRestore())return;V.ready=true;await save('connect')}catch(e){if(e.name!=='AbortError')set('fail',e.message)}}
-function confirmBar(m){return window.confirm(m)}
+async function connect(){let step='open folder picker';try{
+  let d;try{d=await window.showDirectoryPicker({id:'memecoinvault',mode:'readwrite',startIn:'documents'})}catch(e){if(e.name==='AbortError')throw new Error('folder picker was closed, or Chrome\'s "Let site edit files?" was not allowed — click Connect again and choose Allow / Edit files');throw e}
+  step='get edit permission';let p='prompt';try{p=await d.queryPermission({mode:'readwrite'})}catch(e){}
+  if(p!=='granted'){try{p=await d.requestPermission({mode:'readwrite'})}catch(e){throw new Error('Chrome refused edit permission ('+e.message+')')}}
+  if(p!=='granted')throw new Error('Chrome did not allow saving in "'+d.name+'" (answer: '+p+') — click Connect again and choose Allow');
+  step='remember folder';V.dir=d;V.pick=d.name;try{await iput('dir',d)}catch(e){V.remember='not remembered ('+e.message+') — you will need to click Connect after each restart'}
+  step='restore check';if(await maybeRestore())return;V.ready=true;
+  step='first save';const ok=await save('connect');if(ok&&!/meme coin vault|^logs$/i.test(d.name))vmsg('Saving into "'+d.name+'/Logs" — that is not the Meme Coin Vault folder. Click Pick folder again if that was a mistake.')
+ }catch(e){V.ready=!!V.dir;set('fail',(e&&e.message||String(e))+' [step: '+step+']')}}
 async function allow(){try{const p=await V.dir.requestPermission({mode:'readwrite'});if(p==='granted'){if(await maybeRestore())return;V.ready=true;await save('allow')}else set('perm')}catch(e){set('fail',e.message)}}
 // ---- export / restore-from-file ----
 function exportAll(){const t=JSON.stringify({app:'MemeCoinVault',v:1,saved:new Date().toISOString(),ls:snapshotAll()},null,1);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));a.download='meme_vault_backup_'+new Date().toLocaleDateString('en-CA')+'.json';a.click();vmsg('Exported everything ('+Math.round(t.length/1024)+' KB)')}
