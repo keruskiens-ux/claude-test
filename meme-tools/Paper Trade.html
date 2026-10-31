@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Paper Trade</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Paper Trade</title>
 <style>
 :root{--bg:#07090d;--p:#10141c;--b:#232a38;--t:#e8e8ea;--m:#8a91a3;--g:#2fd6a0;--r:#ff5468;--y:#ffb020;--a:#6c7bff}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 400px at 0 -10%,#1a1440 0,transparent 60%),var(--bg);color:var(--t);font:13px system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
@@ -30,6 +30,9 @@ a{color:#8ab4ff}.lnk{font-size:12px}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px 0}.cal div{background:#0e1118;border:1px solid var(--b);border-radius:6px;min-height:34px;padding:3px 5px;font-size:11px}.cal .h{background:none;border:0;color:var(--m);text-align:center;min-height:0}.cal .w{background:#0f2a22;border-color:#1e6b54}.cal .l{background:#2c1218;border-color:#7a2433}.cal b{display:block;font-size:12px}
 .wbtn{flex:1;background:#1b2030;border:1px solid var(--b);color:var(--t);border-radius:6px;padding:5px;cursor:pointer;font-size:12px}.wbtn:disabled{opacity:.4;cursor:default}
 .empty{display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:8px}
+details.dtp{padding:8px 10px}details.dtp>summary{cursor:pointer;color:#8ab4ff;font-size:12px;list-style:none}details.dtp>summary::-webkit-details-marker{display:none}details.dtp[open]>summary{color:var(--m);margin-bottom:8px}details.dtp>.box{margin-top:8px}
+#pB,#pS,#pH,#pP{font-size:16px}#bal{font-size:16px}
+@media(max-width:800px){body{height:auto;min-height:100vh}main{display:flex;flex-direction:column}aside{border-left:0;border-top:1px solid var(--b);overflow:visible}#chart{min-height:260px;height:260px;flex:none}.tabs{overflow-x:auto;flex-wrap:nowrap}.tabs button{white-space:nowrap}.pane{height:260px}header{gap:10px}header .mc{font-size:18px}table{font-size:11px}#vbar{right:10px}}
 </style></head><body>
 <header id="hdr"><span class="muted">Loading…</span></header>
 <main>
@@ -57,9 +60,11 @@ a{color:#8ab4ff}.lnk{font-size:12px}
    <div class="g3" id="pstats" style="margin-top:8px"></div>
    <div class="row" style="margin-top:6px"><span class="muted">Show entry/now as</span><a href="#" id="unitTog" class="muted">market cap ⇄ price</a></div>
   </div>
+  <details class="box dtp"><summary>▸ details — token info, links, live-feed key</summary>
   <div class="box"><b>Token Info</b><div class="g3" id="sec" style="margin-top:8px"></div></div>
   <div class="box lnk" id="links"></div>
   <div class="box"><b>Live feed</b> <span id="feedSt" class="muted">off</span><div class="muted" style="margin:4px 0">Paste your free Helius API key to turn on live trades.</div><div style="display:flex;gap:6px"><input id="hk" placeholder="Paste Helius API key (xxxxxxxx-xxxx-…)" style="flex:1;min-width:0;padding:6px;background:#0e1118;color:#fff;border:1px solid #333;border-radius:6px;filter:blur(5px)"><button id="hkEye" title="Show / hide key" style="padding:0 8px;background:#0e1118;color:#fff;border:1px solid #333;border-radius:6px;cursor:pointer">👁</button></div></div>
+  </details>
  </aside>
 </main>
 <div id="toast"></div>
