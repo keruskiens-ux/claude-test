@@ -371,4 +371,88 @@ $('#hk').onchange=()=>{const v=$('#hk').value.trim();if(v&&!/^[0-9a-f]{8}-[0-9a-
  try{localStorage.setItem(HK,v)}catch(e){};toast(v?'Helius key saved':'Key removed');connect()};
 setSide('buy');sched(true);
 
-</script></body></html>
+</script><div id="vbar" style="position:fixed;left:10px;bottom:10px;z-index:50;font:12px Inter,system-ui,sans-serif;max-width:calc(100vw - 20px)"></div>
+<input type="file" id="vFile" accept=".json,application/json" style="display:none">
+<script>
+// ===== Vault auto-backup (session 10) — identical block in Quick Scan + Paper Trade =====
+// Saves to <Meme Coin Vault>/Logs/ after every trade + every scan: wallet.json, paper_trades.csv, scan_history.csv,
+// scan_history.json (full data used for restore), accuracy_report.md, plus a daily copy in Logs/backup/. Browser copy kept too.
+// Folder handle is remembered in IndexedDB. Never fails silently: red "NOT BACKED UP" bar whenever a save can't happen.
+(()=>{
+const WATCH=/^(papertrade_v1|qs_history|qs_card_|qs_acc|qs_tags)/, SKIP=/helius/i;
+const DBN='mcv_vault',OS='h';
+const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);r.onupgradeneeded=()=>r.result.createObjectStore(OS);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const iget=async k=>{try{const d=await idb();return await new Promise(r=>{const q=d.transaction(OS).objectStore(OS).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}};
+const iput=async(k,v)=>{const d=await idb();await new Promise((r,j)=>{const t=d.transaction(OS,'readwrite');t.objectStore(OS).put(v,k);t.oncomplete=r;t.onerror=()=>j(t.error)})};
+const V=window.VAULT={dir:null,state:'init',err:'',lastOk:0,ready:false,saves:0};
+const bar=document.getElementById('vbar');
+const btn=(id,t,tip)=>'<button id="'+id+'" title="'+(tip||'')+'" style="margin-left:6px;background:#fff;color:#000;border:0;border-radius:6px;padding:3px 8px;font-weight:700;cursor:pointer">'+t+'</button>';
+const small=(id,t,tip)=>'<a href="#" id="'+id+'" title="'+(tip||'')+'" style="color:#8ab4ff;margin-left:8px">'+t+'</a>';
+function draw(){
+ const ex=small('vExp','Export everything','Download one file with your wallet, every trade, scan history and accuracy data (manual backup)')+small('vImp','Restore from file','Load a file made by Export everything (shows a preview, asks before replacing)');
+ if(V.state==='ok'){bar.innerHTML='<span style="background:#0f2a22;border:1px solid #1e6b54;color:#2fe0a5;border-radius:8px;padding:4px 8px;display:inline-block" title="Every scan and trade is written to your Meme Coin Vault/Logs folder">✓ Backed up to vault/Logs '+(V.lastOk?new Date(V.lastOk).toLocaleTimeString():'')+ex+'</span>'}
+ else{const why={init:'checking vault folder…',unsupported:"this browser can't write to a folder (use Chrome on PC). Use Export everything / Copy wallet",off:'vault folder not connected',perm:'Chrome needs your OK to keep saving to the vault',fail:'last save FAILED: '+V.err,saving:'saving…'}[V.state]||V.state;
+  const act=V.state==='off'?btn('vCon','Connect vault folder','Pick your Meme Coin Vault folder once — every scan and trade then auto-saves to its Logs folder'):V.state==='perm'?btn('vPerm','Allow (1 click)','Chrome asks again after a restart unless you chose "Allow on every visit"'):V.state==='fail'?btn('vRetry','Retry')+btn('vCon','Pick folder again'):'';
+  bar.innerHTML='<div style="background:#b3122e;color:#fff;border-radius:8px;padding:7px 10px;font-weight:800;box-shadow:0 0 18px #ff4d6a66">⚠ NOT BACKED UP — '+why+act+ex.replace(/color:#8ab4ff/g,'color:#fff;text-decoration:underline')+'</div>'}
+ const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=ev=>{ev.preventDefault();fn()}};
+ on('vCon',connect);on('vPerm',allow);on('vRetry',()=>save('retry'));on('vExp',exportAll);on('vImp',()=>document.getElementById('vFile').click());
+}
+function set(s,err){V.state=s;if(err!=null)V.err=err;draw()}
+// ---- data builders (read straight from browser storage; both pages share it) ----
+const J=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}};
+const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+function tradesCsv(w){const SK=['mc','liq','top10','insiders','holders','rug','timing','tips','wallet','scanAgeMin','price_src','warnings'];
+ return 'time,token,ca,side,sol,tokens,price_sol,price_usd,mc,pnl_sol,'+SK.map(k=>'snap_'+k).join(',')+'\n'+(w.hist||[]).map(h=>[new Date(h.t).toISOString(),h.sym,h.ca,h.side,h.sol,h.tok,h.px,h.pu,h.mc,h.pnl,...SK.map(k=>(h.snap||{})[k])].map(q).join(',')).join('\n')}
+function scanCsv(h){const tags=J('qs_tags',{});const C=['time','ca','symbol','mcap','liq','holders','top10','insiders','rug','entry','flags','source','button','early','volwarn','check24_at','check24_result','check24_mc_change','check24_liq_change'];
+ return C.join(',')+'\n'+h.map(x=>{const r=x.r24||{};return [new Date(x.t).toISOString(),x.ca,x.sym,x.mc,x.liq,x.holders,x.top10,x.ins,x.rug,x.entry,x.flags,tags[x.ca]||x.src||'',x.btn||'',x.early?'EARLY':'',x.volw?'VOL WARN':'',r.at?new Date(r.at).toISOString():'',r.res||'',r.mcx!=null?(r.mcx*100-100).toFixed(1)+'%':'',r.lqx!=null?(r.lqx*100-100).toFixed(1)+'%':''].map(q).join(',')}).join('\n')}
+function snapshotAll(){const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!SKIP.test(k)&&/^(papertrade_|qs_|pt_)/.test(k))o[k]=localStorage.getItem(k)}return o}
+function hasData(){return localStorage.getItem('papertrade_v1')!=null||localStorage.getItem('qs_history')!=null}
+// ---- file helpers ----
+async function logsDir(){const d=V.dir;return d.name==='Logs'?d:await d.getDirectoryHandle('Logs',{create:true})}
+async function writeF(dir,name,text){const fh=await dir.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(text);await w.close()}
+async function readF(dir,name){try{const fh=await dir.getFileHandle(name);return await (await fh.getFile()).text()}catch(e){return null}}
+// ---- save (debounced, one window at a time) ----
+let tmr=0;
+window.vaultSave=function(reason){if(!V.ready)return;clearTimeout(tmr);tmr=setTimeout(()=>save(reason),700)};
+async function save(reason){
+ if(!V.dir){if(V.state!=='unsupported')set(V.state==='perm'?'perm':'off');return false}
+ try{if((await V.dir.queryPermission({mode:'readwrite'}))!=='granted'){set('perm');return false}}catch(e){set('fail',e.message);return false}
+ const run=async()=>{const L=await logsDir(),w=J('papertrade_v1',null),h=J('qs_history',[]);
+  const full=JSON.stringify({app:'MemeCoinVault',v:1,saved:new Date().toISOString(),ls:snapshotAll()});
+  if(w){await writeF(L,'wallet.json',JSON.stringify(w,null,1));await writeF(L,'paper_trades.csv',tradesCsv(w))}
+  await writeF(L,'scan_history.csv',scanCsv(h));await writeF(L,'scan_history.json',full);
+  if(window.accuracyReport){try{await writeF(L,'accuracy_report.md',window.accuracyReport())}catch(e){}}
+  const B=await L.getDirectoryHandle('backup',{create:true}),day=new Date().toLocaleDateString('en-CA');await writeF(B,'vault_'+day+'.json',full)};
+ try{if(navigator.locks)await navigator.locks.request('mcv_vault_save',run);else await run();V.lastOk=Date.now();V.saves++;V.lastReason=reason;set('ok','');return true}
+ catch(e){set('fail',(e&&e.message)||String(e));return false}}
+// any write to watched keys in THIS window → save (other windows save their own writes)
+const _set=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){_set.call(this,k,v);if(this===window.localStorage&&WATCH.test(k))window.vaultSave(k)};
+// ---- restore: browser data empty but vault files exist ----
+async function maybeRestore(){if(hasData()||!V.dir)return false;try{const L=await logsDir();let t=await readF(L,'scan_history.json'),o=null;
+  if(t){try{o=JSON.parse(t).ls}catch(e){}}if(!o){const w=await readF(L,'wallet.json');if(w){try{JSON.parse(w);o={papertrade_v1:w}}catch(e){}}}
+  if(!o||!Object.keys(o).length)return false;for(const k in o)if(!SKIP.test(k))_set.call(localStorage,k,o[k]);
+  sessionStorage.setItem('mcv_restored',Object.keys(o).length);location.reload();return true}catch(e){set('fail','restore failed: '+e.message);return false}}
+async function connect(){try{const d=await window.showDirectoryPicker({id:'memecoinvault',mode:'readwrite',startIn:'documents'});
+  if(!/meme coin vault|^logs$/i.test(d.name)&&!confirmBar('That folder is "'+d.name+'", not "Meme Coin Vault". Use it anyway?'))return;
+  V.dir=d;await iput('dir',d);if(await maybeRestore())return;V.ready=true;await save('connect')}catch(e){if(e.name!=='AbortError')set('fail',e.message)}}
+function confirmBar(m){return window.confirm(m)}
+async function allow(){try{const p=await V.dir.requestPermission({mode:'readwrite'});if(p==='granted'){if(await maybeRestore())return;V.ready=true;await save('allow')}else set('perm')}catch(e){set('fail',e.message)}}
+// ---- export / restore-from-file ----
+function exportAll(){const t=JSON.stringify({app:'MemeCoinVault',v:1,saved:new Date().toISOString(),ls:snapshotAll()},null,1);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));a.download='meme_vault_backup_'+new Date().toLocaleDateString('en-CA')+'.json';a.click();vmsg('Exported everything ('+Math.round(t.length/1024)+' KB)')}
+document.getElementById('vFile').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;let o;try{o=JSON.parse(await f.text());if(o.app!=='MemeCoinVault'||!o.ls)throw 0}catch(e){alertBar('Not a Meme Coin Vault backup file — nothing changed.');return}
+ const w=(()=>{try{return JSON.parse(o.ls.papertrade_v1||'null')}catch(e){return null}})(),h=(()=>{try{return JSON.parse(o.ls.qs_history||'[]')}catch(e){return []}})();
+ if(window.confirm('Restore backup from '+(o.saved||'?')+'?\nWallet: '+(w?w.bal.toFixed(3)+' SOL, '+w.hist.length+' trades':'none')+'\nScan history: '+h.length+' coins\nThis REPLACES what is in this browser now.')){for(const k in o.ls)if(!SKIP.test(k))_set.call(localStorage,k,o.ls[k]);location.reload()}};
+function vmsg(m){if(typeof toast==='function')return toast(m);const d=document.createElement('div');d.textContent=m;d.style.cssText='background:#0f2a22;color:#2fe0a5;padding:6px 10px;border-radius:8px;margin-top:4px';bar.appendChild(d);setTimeout(()=>d.remove(),5000)}
+function alertBar(m){set(V.state);const d=document.createElement('div');d.textContent=m;d.style.cssText='background:#b3122e;color:#fff;padding:6px 10px;border-radius:8px;margin-top:4px';bar.appendChild(d);setTimeout(()=>d.remove(),5000)}
+// ---- start ----
+(async()=>{if(!window.showDirectoryPicker&&!window.__VAULT_TEST_DIR){V.state='unsupported';V.ready=true;draw();return}
+ const d=window.__VAULT_TEST_DIR||await iget('dir');if(!d){set('off');V.ready=true;return}V.dir=d;
+ let p='prompt';try{p=await d.queryPermission({mode:'readwrite'})}catch(e){}
+ if(p!=='granted'){set('perm');return}
+ if(await maybeRestore())return;V.ready=true;
+ const r=sessionStorage.getItem('mcv_restored');if(r){sessionStorage.removeItem('mcv_restored');vmsg('Restored '+r+' saved items from your vault')}
+ await save('load')})();
+draw();
+})();
+</script>
+</body></html>
