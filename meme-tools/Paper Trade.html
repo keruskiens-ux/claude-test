@@ -405,6 +405,7 @@ function tradesCsv(w){const SK=['mc','liq','top10','insiders','holders','rug','t
  return 'time,token,ca,side,sol,tokens,price_sol,price_usd,mc,pnl_sol,'+SK.map(k=>'snap_'+k).join(',')+'\n'+(w.hist||[]).map(h=>[new Date(h.t).toISOString(),h.sym,h.ca,h.side,h.sol,h.tok,h.px,h.pu,h.mc,h.pnl,...SK.map(k=>(h.snap||{})[k])].map(q).join(',')).join('\n')}
 function scanCsv(h){const tags=J('qs_tags',{});const C=['time','ca','symbol','mcap','liq','holders','top10','insiders','rug','entry','flags','source','button','early','volwarn','check24_at','check24_result','check24_mc_change','check24_liq_change'];
  return C.join(',')+'\n'+h.map(x=>{const r=x.r24||{};return [new Date(x.t).toISOString(),x.ca,x.sym,x.mc,x.liq,x.holders,x.top10,x.ins,x.rug,x.entry,x.flags,tags[x.ca]||x.src||'',x.btn||'',x.early?'EARLY':'',x.volw?'VOL WARN':'',r.at?new Date(r.at).toISOString():'',r.res||'',r.mcx!=null?(r.mcx*100-100).toFixed(1)+'%':'',r.lqx!=null?(r.lqx*100-100).toFixed(1)+'%':''].map(q).join(',')}).join('\n')}
+window.vaultScanCsv=scanCsv;
 function snapshotAll(){const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!SKIP.test(k)&&/^(papertrade_|qs_|pt_)/.test(k))o[k]=localStorage.getItem(k)}return o}
 function hasData(){return localStorage.getItem('papertrade_v1')!=null||localStorage.getItem('qs_history')!=null}
 // ---- file helpers ----
