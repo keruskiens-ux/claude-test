@@ -223,7 +223,8 @@ $('#hideSeen').onchange=()=>{try{localStorage.setItem('qs_hide',$('#hideSeen').c
 function feed(ms,btn,n){const all=[...new Set(ms)].filter(c=>c&&!c.startsWith('So111'));let use=all,hid=0;if($('#hideSeen').checked){const S=seenSet();use=all.filter(c=>!S.has(c));hid=all.length-use.length}
  use=use.slice(0,n||50);if(!use.length){$('#out').innerHTML='<div class="load">'+(hid?'All '+hid+' coins from '+btn+' are already in your History (hide toggle is on). Try again in a minute for new ones.':'No coins from '+btn+' right now. Try again in a minute.')+'</div>';return}
  use.forEach(c=>BTNOF[c]=btn);$('#in').value=use.join('\n');$('#t').textContent=btn+': '+all.length+' found'+(hid?', '+hid+' already scanned (hidden)':'')+', scanning '+use.length;go()}
-const GK=u=>f('https://api.geckoterminal.com/api/v2/networks/solana/'+u);
+// GeckoTerminal free limit ≈30 calls/min → calls are spaced ≥700ms apart, one at a time
+let gkQ=Promise.resolve(),gkLast=0;const GK=u=>{const r=gkQ.then(async()=>{const w=700-(Date.now()-gkLast);if(w>0)await new Promise(z=>setTimeout(z,w));gkLast=Date.now();return f('https://api.geckoterminal.com/api/v2/networks/solana/'+u)});gkQ=r.catch(()=>{});return r};
 const gkBase=x=>{const a=((x.relationships||{}).base_token||{}).data;return a&&a.id.replace('solana_','')};
 // ---- live pump.fun data: ONE PumpPortal websocket (free: new launches + migrations) ----
 // PumpPortal's per-coin trade feed needs a funded API key (real SOL) → not used. Final Stretch % is read on-chain instead (Helius getMultipleAccounts, 1 call per ~20s).
