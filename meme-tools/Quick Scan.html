@@ -269,15 +269,18 @@ function accData(){let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}c
   timing:grp(x=>x.entry?String(x.entry):null),extra:grp(x=>[x.early?'EARLY':null,x.volw?'VOL WARN':null].filter(Boolean)),
   source:grp(x=>tags[x.ca]||'untagged'),button:grp(x=>x.btn||'pasted')}}
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'-';
-function accuracyReport(){const d=accData(),L=[];const base=d.verdict['NOT A RUG'],baseDead=base&&base.n?base.dead/base.n:0;
+function accuracyReport(){const d=accData(),L=[];
  L.push('# Quick Scan accuracy report — '+new Date().toLocaleString(),'','Coins re-checked 24h after scan: **'+d.rows.length+'** (waiting for 24h: '+d.pending+' scans). RUGGED = MC −80%+, LIQ PULLED = liquidity −80%+, GONE = no pool, PUMPED = MC 2x+.','');
  if(!d.rows.length){L.push('No coin is 24h old yet — keep Quick Scan open (or open it) after 24h and the re-check runs by itself.');return L.join('\n')}
  const v=d.verdict,P=v['NOT A RUG'],R=v['RISKY'],A=v['RUG RISK'];
  L.push('## Headline','- NOT A RUG coins that rugged/died: **'+(P?pct(P.dead,P.n)+' ('+P.dead+'/'+P.n+')':'-')+'** — lower is better','- RUG RISK coins that survived: **'+(A?pct(A.n-A.dead,A.n)+' ('+(A.n-A.dead)+'/'+A.n+')':'-')+'** — lower is better','- RISKY coins that survived: '+(R?pct(R.n-R.dead,R.n)+' ('+(R.n-R.dead)+'/'+R.n+')':'-'),'');
  const tbl=(title,g,note)=>{L.push('## '+title+(note?' — '+note:''),'| | coins | rugged/died | pumped 2x+ | alive |','|---|---|---|---|---|');Object.entries(g).sort((a,b)=>b[1].n-a[1].n).forEach(([k,e])=>L.push('| '+k+' | '+e.n+' | '+pct(e.dead,e.n)+' | '+pct(e.pump,e.n)+' | '+pct(e.alive,e.n)+' |'));L.push('')};
  tbl('By verdict',d.verdict);
- L.push('## By check (flag shown on the card)','| check | coins flagged | rugged/died | survived | verdict |','|---|---|---|---|---|');
- Object.entries(d.check).sort((a,b)=>b[1].n-a[1].n).forEach(([k,e])=>{const dr=e.dead/e.n;const bad=e.n>=8&&(dr<=baseDead+0.05||(e.n-e.dead)/e.n>=0.7);L.push('| '+k+' | '+e.n+' | '+pct(e.dead,e.n)+' | '+pct(e.n-e.dead,e.n)+' | '+(e.n<8?'too few to judge':bad?'⚠ OFTEN WRONG — consider cutting':'ok')+' |')});L.push('');
+ L.push('## By check (flag shown on the card)','⛔ = claims "likely fake/rug": OFTEN WRONG if 70%+ of flagged coins were still alive 24h later. ⚠️ = caution: compared with coins that did NOT get it — no better than random if flagged coins did not die more often.','','| check | coins flagged | rugged/died | without this flag | verdict |','|---|---|---|---|---|');
+ const allN=d.rows.length,allDead=d.rows.filter(x=>DEADR.has(x.r24.res)).length;
+ Object.entries(d.check).filter(([k])=>!/unavailable|incomplete|could not/i.test(k)).sort((a,b)=>b[1].n-a[1].n).forEach(([k,e])=>{const hard=k.startsWith('⛔'),dr=e.dead/e.n,on=allN-e.n,od=on?(allDead-e.dead)/on:0;
+  const v=e.n<8?'too few to judge (need 8)':hard?((e.n-e.dead)/e.n>=0.7?'⚠ OFTEN WRONG — '+pct(e.n-e.dead,e.n)+' survived, consider cutting':'ok — '+pct(e.dead,e.n)+' died'):(on<8?'not enough coins without it':dr<=od?'⚠ no better than random — consider cutting':'useful — died '+pct(e.dead,e.n)+' vs '+Math.round(od*100)+'% without');
+  L.push('| '+k+' | '+e.n+' | '+pct(e.dead,e.n)+' | '+(on?Math.round(od*100)+'% of '+on:'-')+' | '+v+' |')});L.push('');
  tbl('By timing badge',d.timing);if(Object.keys(d.extra).length)tbl('EARLY / volume warning',d.extra);tbl('By source (your tag)',d.source,'which sources find better coins');tbl('By Quick Scan button',d.button);
  return L.join('\n')}
 window.accuracyReport=accuracyReport;
