@@ -28,6 +28,7 @@ aside{border-left:1px solid var(--b);padding:10px;overflow:auto;display:flex;fle
 a{color:#8ab4ff}.lnk{font-size:12px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1b2130;border:1px solid var(--y);padding:8px 14px;border-radius:8px;display:none}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px 0}.cal div{background:#0e1118;border:1px solid var(--b);border-radius:6px;min-height:34px;padding:3px 5px;font-size:11px}.cal .h{background:none;border:0;color:var(--m);text-align:center;min-height:0}.cal .w{background:#0f2a22;border-color:#1e6b54}.cal .l{background:#2c1218;border-color:#7a2433}.cal b{display:block;font-size:12px}
+.wbtn{flex:1;background:#1b2030;border:1px solid var(--b);color:var(--t);border-radius:6px;padding:5px;cursor:pointer;font-size:12px}.wbtn:disabled{opacity:.4;cursor:default}
 .empty{display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:8px}
 </style></head><body>
 <header id="hdr"><span class="muted">Loading…</span></header>
@@ -40,6 +41,8 @@ a{color:#8ab4ff}.lnk{font-size:12px}
  <aside>
   <div class="box">
    <div class="row"><b>Paper Wallet</b><span><b id="bal">0</b> <a href="#" id="reset" class="muted">reset</a></span></div>
+   <div class="row" style="margin-top:6px;gap:6px"><button id="wCopy" class="wbtn" title="Copy your whole paper wallet (balance, positions, every trade) as one code — paste it into Load wallet on your phone or another PC">📋 Copy wallet</button><button id="wLoad" class="wbtn" title="Paste a wallet code from Copy wallet. Shows a preview first; your current wallet is only replaced after you confirm">📥 Load wallet</button></div>
+   <div id="wPanel" style="display:none;margin-top:6px"><textarea id="wCode" rows="3" placeholder="Paste wallet code (starts with PTW1.)" style="width:100%;box-sizing:border-box;background:#0e1118;color:#fff;border:1px solid #333;border-radius:6px;font-size:11px"></textarea><div id="wPrev" class="muted" style="margin:4px 0"></div><div class="row" style="gap:6px"><button id="wOk" class="wbtn" disabled>Replace my wallet with this</button><button id="wNo" class="wbtn">Cancel</button></div></div>
   </div>
   <div class="box">
    <div class="bs"><button class="buy on" id="tBuy">Buy</button><button class="sell" id="tSell">Sell</button></div>
@@ -173,6 +176,27 @@ $('#go').onclick=()=>{
   st.hist.unshift({t:Date.now(),ca,sym:p.sym,side:'SELL',sol,tok,px:pxNow,pu:puNow,mc:mcNow,pnl:sol-basis,snap});return 'Paper sold '+v+'% for '+sol.toFixed(4)+' SOL'});
  toast(res)};
 $('#reset').onclick=e=>{e.preventDefault();if(confirm('Reset paper wallet to '+START+' SOL and clear ALL history (every window)?')){mutate(st=>{st.bal=START;st.pos={};st.hist=[]});toast('Wallet reset')}};
+// ---------- wallet copy / load (session 10): move the paper wallet between PC and phone ----------
+// Code = "PTW1." + base64url(deflate(JSON)) + "." + 8-hex checksum of the JSON. Bad/changed codes are rejected before anything is touched.
+const b64u=b=>{let s='';const a=new Uint8Array(b);for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode.apply(null,a.subarray(i,i+8192));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+const ub64u=t=>{t=t.replace(/-/g,'+').replace(/_/g,'/');while(t.length%4)t+='=';const s=atob(t),a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a};
+const ck8=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0}return h.toString(16).padStart(8,'0')};
+async function zip(str,inflate){const cs=inflate?new DecompressionStream('deflate-raw'):new CompressionStream('deflate-raw');const out=new Blob([inflate?str:new TextEncoder().encode(str)]).stream().pipeThrough(cs);return inflate?await new Response(out).text():await new Response(out).arrayBuffer()}
+async function walletCode(){const j=JSON.stringify(load());return 'PTW1.'+b64u(await zip(j))+'.'+ck8(j)}
+function validWallet(v){return v&&typeof v==='object'&&typeof v.bal==='number'&&isFinite(v.bal)&&v.bal>=0&&v.pos&&typeof v.pos==='object'&&!Array.isArray(v.pos)&&Array.isArray(v.hist)&&v.hist.every(h=>h&&typeof h.t==='number'&&(h.side==='BUY'||h.side==='SELL')&&typeof h.sol==='number')&&Object.values(v.pos).every(p=>p&&typeof p.tok==='number'&&isFinite(p.tok))}
+async function parseWallet(code){code=(code||'').replace(/\s+/g,'');const m=/^PTW1\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})$/.exec(code);if(!m)throw new Error('Not a wallet code (should start with PTW1.)');
+ let j;try{j=await zip(ub64u(m[1]),true)}catch(e){throw new Error('Code is damaged (could not unpack) — copy it again')}
+ if(ck8(j)!==m[2])throw new Error('Code is damaged or incomplete (checksum mismatch) — copy it again');
+ let v;try{v=JSON.parse(j)}catch(e){throw new Error('Code is damaged (bad data)')}if(!validWallet(v))throw new Error('Code does not contain a valid paper wallet');return v}
+let wPending=null;
+$('#wCopy').onclick=async()=>{try{const c=await walletCode();try{await navigator.clipboard.writeText(c);toast('Wallet copied ('+c.length+' chars) — paste it into Load wallet on the other device')}catch(e){$('#wPanel').style.display='block';$('#wCode').value=c;$('#wPrev').textContent='Clipboard blocked — select the code above and copy it by hand.';$('#wOk').disabled=true}}catch(e){toast('Copy failed: '+e.message)}};
+$('#wLoad').onclick=()=>{$('#wPanel').style.display='block';$('#wCode').value='';$('#wPrev').textContent='Paste a wallet code. Nothing changes until you confirm.';$('#wOk').disabled=true;wPending=null;$('#wCode').focus()};
+$('#wNo').onclick=()=>{$('#wPanel').style.display='none';wPending=null};
+$('#wCode').oninput=async()=>{const c=$('#wCode').value;wPending=null;$('#wOk').disabled=true;if(!c.trim()){$('#wPrev').textContent='';return}
+ try{const v=await parseWallet(c);if($('#wCode').value!==c)return;wPending=v;const open=Object.values(v.pos).filter(p=>p.tok>0).length,cur=load();
+  $('#wPrev').innerHTML='<b style="color:var(--g)">Valid wallet</b>: balance <b>'+v.bal.toFixed(3)+' SOL</b> · <b>'+v.hist.length+'</b> trades · '+open+' open position'+(open===1?'':'s')+'<br>Your current wallet ('+cur.bal.toFixed(3)+' SOL, '+cur.hist.length+' trades) will be replaced in every open window.';$('#wOk').disabled=false}
+ catch(e){if($('#wCode').value!==c)return;$('#wPrev').innerHTML='<b style="color:var(--r)">Rejected:</b> '+e.message+' — your wallet was not touched.'}};
+$('#wOk').onclick=()=>{if(!wPending)return;const v=wPending;mutate(s=>{s.bal=v.bal;s.pos=v.pos;s.hist=v.hist});wPending=null;$('#wPanel').style.display='none';toast('Wallet loaded: '+v.bal.toFixed(3)+' SOL, '+v.hist.length+' trades');if(window.vaultSave)vaultSave('wallet')};
 // highest gain / biggest drawdown since entry: tracked while a window is open, saved every 10s
 let hlDirty=0;
 function trackHiLo(){const p=st.pos[ca];if(!p||!(p.tok>0)||!priceSol)return;if(priceSol>p.hi){p.hi=priceSol;hlDirty=1}if(!p.lo||priceSol<p.lo){p.lo=priceSol;hlDirty=1}
