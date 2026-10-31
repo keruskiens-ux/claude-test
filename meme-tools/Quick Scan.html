@@ -306,7 +306,8 @@ let gkQ=Promise.resolve(),gkLast=0;const GK=u=>{const r=gkQ.then(async()=>{const
 // One GeckoTerminal call (1-min candles), only for coins up in the last hour. Logged in History (volw) for the accuracy report.
 async function volWarn(m){const P=PAIR[m];if(!P||!P.a)return;const el=document.getElementById('vw_'+m);
  const pc=(((await f('https://api.dexscreener.com/latest/dex/pairs/solana/'+P.a))||{}).pair||{}).priceChange||{};if(!((+pc.h1||0)>10&&(+pc.m5||0)>=-2))return;
- const j=await GK('pools/'+P.a+'/ohlcv/minute?aggregate=1&limit=60');const c=(((j||{}).data||{}).attributes||{}).ohlcv_list;if(!c||c.length<30)return;
+ let j=await GK('pools/'+P.a+'/ohlcv/minute?aggregate=1&limit=60');if(!j){await new Promise(z=>setTimeout(z,4000+Math.random()*3000));j=await GK('pools/'+P.a+'/ohlcv/minute?aggregate=1&limit=60')}
+ const c=(((j||{}).data||{}).attributes||{}).ohlcv_list;if(!c||c.length<30){P.volInfo={skipped:j?'quiet (few 1-min candles)':'GeckoTerminal busy'};return}
  const cs=c.slice().sort((a,b)=>a[0]-b[0]),hi=Math.max(...cs.map(x=>+x[2])),last=+cs[cs.length-1][4],hiRecent=Math.max(...cs.slice(-5).map(x=>+x[2]));
  const v=x=>x.reduce((t,y)=>t+(+y[5]||0),0),vNow=v(cs.slice(-10)),vPrev=v(cs.slice(-20,-10));
  const fire=last>=hi*0.97&&hiRecent>=hi*0.97&&vPrev>=2000&&vNow<vPrev*0.5;P.volw=fire;P.volInfo={last,hi,vNow,vPrev};
