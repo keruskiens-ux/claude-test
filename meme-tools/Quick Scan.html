@@ -91,7 +91,7 @@ async function one(m){
  const risks=[],names=[];let hard=0,soft=0;const add=(n,h,x)=>{risks.push(risk(n,h,x));names.push((h?'⛔ ':'⚠️ ')+n);h?hard++:soft++};
  const liq=p?(p.liquidity||{}).usd||0:0,mc=p?(p.marketCap||p.fdv||0):0;
  const AGE=p&&p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/36e5:0,OLD=AGE>24*30;
- if(!p)add('No market',1);else if(mc>100000&&liq<Math.max(1000,mc*0.002))add('No real liquidity',1,'Pool holds only $'+k(liq)+' against a $'+k(mc)+' market cap ('+(mc?(liq/mc*100).toFixed(2):0)+'%). You cannot sell anything meaningful — the market cap is fake. Real coins (even BONK across many pools) are 0.4%+.');else if(liq<R.minLiq)add('Low liquidity',0);
+ if(!p)add('No market',1);else if(mc>100000&&liq<Math.max(1000,mc*0.002))add('No real liquidity',AGE<24*180?1:0,(AGE>=24*180?'(Coin is '+Math.round(AGE/24)+' days old — bridged/big coins often trade mostly on exchanges, so this is only a caution.) ':'')+'Pool holds only $'+k(liq)+' against a $'+k(mc)+' market cap ('+(mc?(liq/mc*100).toFixed(2):0)+'%). You cannot sell anything meaningful — the market cap is fake. Real coins (even BONK across many pools) are 0.4%+.');else if(liq<R.minLiq)add('Low liquidity',0);
  let top10=null,lp=null,ins=null,holders=null,tax=0,cb=null,single=0;
  if(rc){const isPool=poolTest(rc),realH=(rc.topHolders||[]).filter(h=>!isPool(h));// pool/AMM wallets skipped (matches Axiom: MEW 77%->66%)
   top10=realH.slice(0,10).reduce((s,h)=>s+(h.pct||0),0);single=Math.max(0,...realH.map(h=>h.pct||0));
@@ -242,11 +242,12 @@ document.addEventListener('mousemove',e=>{const c=e.target.closest('[data-x]');c
  tm=setTimeout(()=>{tip._c=c;tip.innerHTML='<b>'+c.dataset.t+'</b><br>'+c.dataset.x;tip.style.left=Math.min(e.clientX+12,innerWidth-350)+'px';tip.style.top=Math.min(e.clientY+14,innerHeight-160)+'px';tip.style.display='block'},400)});
 document.addEventListener('click',e=>{const b=e.target.closest('.pt');if(b)window.open('Paper%20Trade.html?ca='+b.dataset.ca,'papertrade_'+b.dataset.ca,'popup,width=1320,height=860')});
 $('#tr').onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling trending coins (DexScreener + GeckoTerminal)…</div>';const ms=[],gk=[];LP.mode=null;drawLive();
- for(const pg of [1,2]){const j=await GK('trending_pools?page='+pg);((j&&j.data)||[]).forEach(x=>{const a=gkBase(x);if(a&&!gk.includes(a))gk.push(a)})}
+ const JUNK=/^(w|st|j|m|b|bn|jit|inf|h|ls|jup|dsol|psol|sol|usd[a-z]*|usdt|usdc|pyusd|eurc)?sol$|^(usdc|usdt|usds|pyusd|eurc|wbtc|cbbtc|weth|eth|btc|jitosol|msol|bsol)$/i,junk=n=>JUNK.test(String(n||'').trim());
+ for(const pg of [1,2]){const j=await GK('trending_pools?page='+pg);((j&&j.data)||[]).forEach(x=>{const a=gkBase(x),nm=(x.attributes.name||'').split(' / ')[0];if(a&&!junk(nm)&&!gk.includes(a))gk.push(a)})}
  for(const pth of ['/token-boosts/top/v1','/token-boosts/latest/v1','/community-takeovers/latest/v1','/token-profiles/latest/v1']){const a=await f('https://api.dexscreener.com'+pth)||[];
   for(const t of a)if(t.chainId==='solana'&&t.tokenAddress&&!ms.includes(t.tokenAddress))ms.push(t.tokenAddress)}
  for(const q of ['pump','pumpswap','meteora','raydium','sol']){const r=await f('https://api.dexscreener.com/latest/dex/search?q='+q);
-  for(const p of (r&&r.pairs)||[])if(p.chainId==='solana'&&!ms.includes(p.baseToken.address))ms.push(p.baseToken.address)}
+  for(const p of (r&&r.pairs)||[])if(p.chainId==='solana'&&!junk(p.baseToken.symbol)&&!ms.includes(p.baseToken.address))ms.push(p.baseToken.address)}
  const mix=[];for(let i=0;i<Math.max(ms.length,gk.length);i++){if(gk[i])mix.push(gk[i]);if(ms[i])mix.push(ms[i])}feed(mix,'Trending',50)};
 $('#cto').onclick=async()=>{$('#out').innerHTML='<div class="load">Pulling DexScreener community takeovers…</div>';const a=await f('https://api.dexscreener.com/community-takeovers/latest/v1')||[];const ms=[];for(const t of a)if(t.chainId==='solana'&&t.tokenAddress&&!ms.includes(t.tokenAddress))ms.push(t.tokenAddress);if(!ms.length){$('#out').innerHTML='<div class="load">No CTO coins returned. Try again in a minute.</div>';return}LP.mode=null;drawLive();feed(ms,'Takeovers',50)};
 $('#hx').onclick=()=>{let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){}const c=window.vaultScanCsv(h);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='scan_history.csv';a.click()};
