@@ -166,14 +166,14 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
  // RugCheck down/no holders → top holders straight from the chain (Helius), pools/program wallets skipped
  let hs=HOLD[m]||[];if(!hs.length){try{hs=HOLD[m]=await chainHolders(m,rpc)}catch(e){}}if(!hs.length){el.textContent='🔍 Wallet check: no holder data (RugCheck + chain both failed)';return}
  let fresh=0,n=0;const fund={};
- await Promise.all(hs.map(async(h,ix)=>{await new Promise(z=>setTimeout(z,ix*120));return (async()=>{try{const r=await rpc('getSignaturesForAddress',[h.o,{limit:25}]);if(!r.result)return;n++;const sg=r.result;if(sg.length<10)fresh++;
+ await Promise.all(hs.map(async(h,ix)=>{await new Promise(z=>setTimeout(z,ix*120));return (async()=>{try{const r=await rpc('getSignaturesForAddress',[h.o,{limit:200}]);if(!r.result)return;n++;const sg=r.result;h.sgN=sg.length;h.first=sg.length?sg[sg.length-1].blockTime:null;if(sg.length<10)fresh++;
   if(sg.length&&sg.length<25){const t=(await rpc('getTransaction',[sg[sg.length-1].signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}])).result;
    if(t){const ks=t.transaction.message.accountKeys.map(a=>a.pubkey||a);let f=null,mx=0;ks.forEach((a,i)=>{const d=t.meta.preBalances[i]-t.meta.postBalances[i];if(a!==h.o&&d>mx){mx=d;f=a}});if(f){(fund[f]=fund[f]||{n:0,p:0});fund[f].n++;fund[f].p+=h.p}}}}catch(e){}})()}));
  const cl=Object.entries(fund).filter(([,v])=>v.n>=3).sort((a,b)=>b[1].p-a[1].p);const out=[];if(PAIR[m])PAIR[m].clN=cl.length;
 
  cl.forEach(([f,v])=>out.push(risk('Cluster: '+v.n+' wallets, '+v.p.toFixed(1)+'%',v.p>=10,v.n+' top holders were all funded by the same wallet ('+f.slice(0,4)+'…'+f.slice(-4)+'). That\'s a Bubblemaps cluster — likely one person. They hold '+v.p.toFixed(1)+'% together and can dump at once. Over ~10% = skip.')));
  await tradeCheck(m,rpc,out);
- await farmCheck(m,rpc,out);
+ await farmCheck(m,rpc,out,hs);
  // real holder count (wallets still holding >0) for young coins — RugCheck counts emptied wallets too (2-3x on old coins)
  try{const P0=PAIR[m],hEl=[...document.querySelectorAll('#out .card')].map(c=>c.querySelector('#wc_'+m)?c:null).find(Boolean);
   if(P0&&P0.ageH<720&&P0.rcH!=null&&P0.rcH<80000){const own=new Set();let pg=1,done=false;
@@ -195,9 +195,10 @@ async function chainHolders(m,rpc){const la=(await rpc('getTokenLargestAccounts'
 // ⛔ Brand-new holder wallets (session 10, catches DESSA-type farmed holders): coins under 30 days. A top-holder wallet is "brand new" if its
 // whole history is under 200 transactions and its first one is no older than the coin (+1 day). Tested: DESSA 58%, HYPERCHAN 84% (fakes) vs
 // 18 real/non-fake young coins 0–25% (NIO, FLOAT, DOPE, Kimchi, Dacity, CLAUDIA, HELL, …). Flag at 50%+ with 10+ wallets.
-async function farmCheck(m,rpc,out){const P=PAIR[m];if(!P||!(P.ageH<720))return;try{let W=await chainHolders(m,rpc);W=W.slice(0,20);if(W.length<10){P.farmStr='new-wallet check: too few holder wallets ('+W.length+')';return}
- const ageD=P.ageH/24,now=Date.now()/1000;let fresh=0;
- for(let i=0;i<W.length;i+=4)await Promise.all(W.slice(i,i+4).map(async w=>{const sg=(await rpc('getSignaturesForAddress',[w.o,{limit:200}])).result||[];const old=sg[sg.length-1];if(sg.length<200&&old&&old.blockTime&&(now-old.blockTime)/86400<=ageD+1)fresh++}));
+async function farmCheck(m,rpc,out,hs){const P=PAIR[m];if(!P||!(P.ageH<720))return;try{
+ // uses the wallet check's own history lookups (no extra Helius calls)
+ const W=(hs||[]).filter(h=>h.sgN!=null).slice(0,20);if(W.length<10){P.farmStr='new-wallet check: too few holder wallets ('+W.length+')';return}
+ const ageD=P.ageH/24,now=Date.now()/1000;const fresh=W.filter(h=>h.sgN<200&&h.first&&(now-h.first)/86400<=ageD+1).length;
  const pc=Math.round(fresh/W.length*100);P.farmPct=pc;P.farmNew=pc>=50;P.farmStr=fresh+'/'+W.length+' top wallets brand-new ('+pc+'%)';
  if(P.farmNew)out.push(risk('Brand-new holder wallets',1,fresh+' of the top '+W.length+' holder wallets were created after this coin launched ('+pc+'%). That is how farmed-holder fakes like DESSA look. In our test real young coins were 0–25%, fakes 58–84%. Check Axiom Global Fees Paid before trusting it.'));
  else out.push('<div class="muted">👛 '+fresh+'/'+W.length+' top wallets brand-new ('+pc+'%) — normal</div>')}catch(e){P.farmStr='new-wallet check failed'}}
