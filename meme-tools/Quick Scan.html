@@ -161,8 +161,10 @@ async function go(append){const ms=[...new Set($('#in').value.match(/(?<![0-9a-z
  await Promise.all(Array.from({length:6},worker))}
 const wq=[];let wbusy=0;
 async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)return;let key=qsKey();
- if(!key){el.innerHTML='🔍 Wallet check: add a Helius key (Quick Scan key box, or Paper Trade)';return}const hs=HOLD[m]||[];if(!hs.length){el.textContent='🔍 Wallet check: no holder data';return}
+ if(!key){el.innerHTML='🔍 Wallet check: add a Helius key (Quick Scan key box, or Paper Trade)';return}
  const rpc=async(mt,pr)=>{for(let i=0;i<6;i++){const r=await fetch('https://mainnet.helius-rpc.com/?api-key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:mt,params:pr})});helCount(r.status);if(r.status===429){await new Promise(z=>setTimeout(z,Math.random()*400+700*(i+1)));continue}return r.json()}return {}};
+ // RugCheck down/no holders → top holders straight from the chain (Helius), pools/program wallets skipped
+ let hs=HOLD[m]||[];if(!hs.length){try{hs=HOLD[m]=await chainHolders(m,rpc)}catch(e){}}if(!hs.length){el.textContent='🔍 Wallet check: no holder data (RugCheck + chain both failed)';return}
  let fresh=0,n=0;const fund={};
  await Promise.all(hs.map(async(h,ix)=>{await new Promise(z=>setTimeout(z,ix*120));return (async()=>{try{const r=await rpc('getSignaturesForAddress',[h.o,{limit:25}]);if(!r.result)return;n++;const sg=r.result;if(sg.length<10)fresh++;
   if(sg.length&&sg.length<25){const t=(await rpc('getTransaction',[sg[sg.length-1].signature,{encoding:'jsonParsed',maxSupportedTransactionVersion:1}])).result;
@@ -171,6 +173,7 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
 
  cl.forEach(([f,v])=>out.push(risk('Cluster: '+v.n+' wallets, '+v.p.toFixed(1)+'%',v.p>=10,v.n+' top holders were all funded by the same wallet ('+f.slice(0,4)+'…'+f.slice(-4)+'). That\'s a Bubblemaps cluster — likely one person. They hold '+v.p.toFixed(1)+'% together and can dump at once. Over ~10% = skip.')));
  await tradeCheck(m,rpc,out);
+ await farmCheck(m,rpc,out);
  // real holder count (wallets still holding >0) for young coins — RugCheck counts emptied wallets too (2-3x on old coins)
  try{const P0=PAIR[m],hEl=[...document.querySelectorAll('#out .card')].map(c=>c.querySelector('#wc_'+m)?c:null).find(Boolean);
   if(P0&&P0.ageH<720&&P0.rcH!=null&&P0.rcH<80000){const own=new Set();let pg=1,done=false;
@@ -178,13 +181,26 @@ async function walletCheck(m){const el=document.getElementById('wc_'+m);if(!el)r
    if(done){P0.realH=own.size;const card=document.getElementById('rp_'+m)?.closest('.card'),box=card&&card.querySelector('.st[data-t="Holders"] b');if(box)box.innerHTML=k(own.size)+' <span class="muted" style="font-size:10px">(RC '+k(P0.rcH)+')</span>';
 }}}catch(e){}
 
- const bad=cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&PAIR[m].noTips);
+ const bad=cl.some(([,v])=>v.p>=10)||!!(PAIR[m]&&(PAIR[m].noTips||PAIR[m].farmNew));
  if(bad){const rp=document.getElementById('rp_'+m);if(rp){const tp=rp.closest('.card').querySelectorAll('.pill')[1];if(tp){tp.className='pill AVOID risk';tp.style.cssText='margin:0;background:none;border:1px solid currentColor';tp.textContent='⛔ DON\'T TRADE';tp.dataset.t='Entry timing: DON\'T TRADE';tp.dataset.x='The deep check found fake activity. Timing doesn\'t matter — skip it.'}rp.className='pill AVOID risk';rp.textContent='🛡 RUG RISK';rp.dataset.x='Deep check (wallets/fees) found fake activity. '+rp.dataset.x;const g=rp.closest('.card').querySelector('.gauge');if(g)g.innerHTML=gauge(20,'DANGER','#ff4d6a')+'<div class="muted">safety score (wallet map failed)</div>'}}
- const wStr=cl.length?cl.map(([,v])=>v.n+'-wallet cluster '+v.p.toFixed(1)+'%').join(', '):'clean ('+fresh+'/'+n+' fresh, no clusters)';
+ const wStr=(PAIR[m]&&PAIR[m].farmStr?PAIR[m].farmStr+'; ':'')+(cl.length?cl.map(([,v])=>v.n+'-wallet cluster '+v.p.toFixed(1)+'%').join(', '):'clean ('+fresh+'/'+n+' fresh, no clusters)');
  try{const d=SUMD[m];if(d){const inc=PAIR[m]&&/FAILED/.test(PAIR[m].tipStr||''),lt=PAIR[m]&&PAIR[m].lowTips;if((inc||lt)&&!bad){d.reasons.unshift(inc?'the deep check could not finish (re-scan it)':'almost no real traders tip right now ('+PAIR[m].tipStr+')');if(d.v==='PASS'){d.v='RISKY';const rp=document.getElementById('rp_'+m);if(rp){rp.className='pill RISKY risk';rp.textContent='🛡 RISKY';const cd=rp.closest('.card'),g=cd.querySelector('.gauge');if(g)g.innerHTML=gauge(88,'CAUTION','#ffbb33')+'<div class="muted">safety score (deep check incomplete)</div>';const tp=cd.querySelectorAll('.pill')[1];if(tp&&/OK TO TRADE/.test(tp.textContent)){tp.className='pill RISKY risk';tp.textContent='⚠️ SMALL SIZE ONLY'}}}}if(bad){d.v='AVOID';if(PAIR[m]&&PAIR[m].noTips)d.reasons.unshift('almost no real traders tip ('+(PAIR[m].tipStr||'')+')');cl.filter(([,v])=>v.p>=10).forEach(([,v])=>d.reasons.unshift(v.n+' linked wallets hold '+v.p.toFixed(0)+'%'))}const se=document.getElementById('sum_'+m);if(se){se.textContent=summary(d);se.className='sum '+d.v}}
   const c=JSON.parse(localStorage.getItem('qs_card_'+m)||'{}');c.tips=(PAIR[m]&&PAIR[m].tipStr)||'n/a';c.wallet=wStr;if(bad)c.rug='RUG RISK';c.t=Date.now();localStorage.setItem('qs_card_'+m,JSON.stringify(c))}catch(e){}
  el.outerHTML=out.length?out.join(''):'<div><span class="clean">🔍 Wallet map looks clean</span> <span class="muted">('+fresh+'/'+n+' fresh, no clusters)</span></div>'}
 const JITO=new Set(['96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5','HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe','Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY','ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49','DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh','ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt','DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL','3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT']);
+async function chainHolders(m,rpc){const la=(await rpc('getTokenLargestAccounts',[m])).result;const tas=(la&&la.value)||[];if(!tas.length)return [];
+ const sup=+(((await rpc('getTokenSupply',[m])).result||{}).value||{}).uiAmount||0;const ai=(await rpc('getMultipleAccounts',[tas.map(x=>x.address),{encoding:'jsonParsed'}])).result;
+ const own=tas.map((t,i)=>({o:ai&&ai.value[i]&&ai.value[i].data.parsed.info.owner,amt:+t.uiAmount})).filter(x=>x.o);const oi=(await rpc('getMultipleAccounts',[own.map(x=>x.o),{encoding:'base64',dataSlice:{offset:0,length:0}}])).result;
+ return own.filter((x,i)=>oi&&oi.value[i]&&oi.value[i].owner==='11111111111111111111111111111111').map(x=>({o:x.o,p:sup?x.amt/sup*100:0,amt:x.amt}))}
+// ⛔ Brand-new holder wallets (session 10, catches DESSA-type farmed holders): coins under 30 days. A top-holder wallet is "brand new" if its
+// whole history is under 200 transactions and its first one is no older than the coin (+1 day). Tested: DESSA 58%, HYPERCHAN 84% (fakes) vs
+// 18 real/non-fake young coins 0–25% (NIO, FLOAT, DOPE, Kimchi, Dacity, CLAUDIA, HELL, …). Flag at 50%+ with 10+ wallets.
+async function farmCheck(m,rpc,out){const P=PAIR[m];if(!P||!(P.ageH<720))return;try{let W=await chainHolders(m,rpc);W=W.slice(0,20);if(W.length<10){P.farmStr='new-wallet check: too few holder wallets ('+W.length+')';return}
+ const ageD=P.ageH/24,now=Date.now()/1000;let fresh=0;
+ for(let i=0;i<W.length;i+=4)await Promise.all(W.slice(i,i+4).map(async w=>{const sg=(await rpc('getSignaturesForAddress',[w.o,{limit:200}])).result||[];const old=sg[sg.length-1];if(sg.length<200&&old&&old.blockTime&&(now-old.blockTime)/86400<=ageD+1)fresh++}));
+ const pc=Math.round(fresh/W.length*100);P.farmPct=pc;P.farmNew=pc>=50;P.farmStr=fresh+'/'+W.length+' top wallets brand-new ('+pc+'%)';
+ if(P.farmNew)out.push(risk('Brand-new holder wallets',1,fresh+' of the top '+W.length+' holder wallets were created after this coin launched ('+pc+'%). That is how farmed-holder fakes like DESSA look. In our test real young coins were 0–25%, fakes 58–84%. Check Axiom Global Fees Paid before trusting it.'));
+ else out.push('<div class="muted">👛 '+fresh+'/'+W.length+' top wallets brand-new ('+pc+'%) — normal</div>')}catch(e){P.farmStr='new-wallet check failed'}}
 async function tradeCheck(m,rpc,out){const P=PAIR[m];if(!P||!P.a)return;try{
  let tx=[];for(let att=0;att<3;att++){tx=[];
  const sg=(((await rpc('getSignaturesForAddress',[P.a,{limit:50}]))||{}).result||[]).filter(x=>!x.err).slice(0,P.ageH<720?40:30);
